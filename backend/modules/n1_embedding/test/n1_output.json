@@ -1,0 +1,56 @@
+{
+  "module": "N1",
+  "model": "BAAI/bge-m3",
+  "samples": [
+    {
+      "label": "Couple — peaceful nature + culture",
+      "input": {
+        "text": "Tôi muốn một chuyến đi yên tĩnh, gần thiên nhiên, có thể khám phá văn hóa địa phương. Tôi đang cảm thấy căng thẳng và muốn thư giãn.",
+        "image_description": "Natural landscape / countryside. Low-rise traditional wooden structures. Peaceful, misty, quiet, green surroundings.",
+        "tags": [
+          "thiên nhiên",
+          "văn hóa",
+          "yên tĩnh",
+          "cặp đôi",
+          "check-in"
+        ]
+      },
+      "output": {
+        "vector": []
+      }
+    },
+    {
+      "label": "Solo — adventure off the beaten path",
+      "input": {
+        "text": "I'm bored and want something completely new. Looking for an adventure, maybe off the beaten path. Love hiking and camping under the stars.",
+        "image_description": "Mountain wilderness trail. No structures, raw dramatic nature. Wild, vast, remote atmosphere.",
+        "tags": [
+          "núi",
+          "cắm trại",
+          "leo núi",
+          "adventure",
+          "stargazing"
+        ]
+      },
+      "output": {
+        "vector": []
+      }
+    },
+    {
+      "label": "Family — beach weekend with kids",
+      "input": {
+        "text": "Gia đình tôi muốn đi chơi cuối tuần, có trẻ nhỏ nên cần nơi an toàn. Các bé thích biển và trò chơi. Không muốn đi xa.",
+        "image_description": "Shallow tropical beach with calm water. Colorful beach resort with slides and pool. Sunny, cheerful, safe family atmosphere.",
+        "tags": [
+          "biển",
+          "gia đình có trẻ em",
+          "vui vẻ",
+          "resort"
+        ]
+      },
+      "output": {
+        "vector": []
+      }
+    }
+  ]
+}
