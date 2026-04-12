@@ -3,7 +3,7 @@ from PIL import Image
 import io
 
 # Nhớ dùng API Key mới của ông nhé
-def process_image_logic(image_bytes: bytes, api_key: str):
+def process_image(image_bytes: bytes, api_key: str):
     """
     Hàm xử lý logic: Nhận bytes ảnh, gọi Gemini và trả về mô tả.
     """
