@@ -13,7 +13,7 @@ Pipeline
 
 from __future__ import annotations
 
-from .maps.registry import scan_text, expand_tags, MatchResult
+from .maps import *
 
 
 def _dedupe(items: list[str]) -> list[str]:

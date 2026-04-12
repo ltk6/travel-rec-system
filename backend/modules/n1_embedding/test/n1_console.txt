@@ -1,0 +1,79 @@
+================================================================
+  N1 – TEXT EMBEDDING MODULE  |  Demo
+================================================================
+── Map Registry ────────────────────────
+  Emotions  :  49 entries
+  Tags      : 174 entries
+  Context   :  49 entries
+  Total     : 272 entries
+────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────
+  Sample 1: Couple — peaceful nature + culture
+────────────────────────────────────────────────────────────────
+  text  : Tôi muốn một chuyến đi yên tĩnh, gần thiên nhiên, có thể khám phá văn hóa địa ph...
+  tags  : ['thiên nhiên', 'văn hóa', 'yên tĩnh', 'cặp đôi', 'check-in']
+[Embedder] Error: 'sentence-transformers' not installed.
+
+  Signals detected:
+    [emotion] 'căng thẳng' → 'relaxation nature tranquil meditation wellness retreat ...'
+  Tag expansions:
+    ✓ 'thiên nhiên' → 'nature outdoor greenery scenic landscape'
+    ✓ 'văn hóa' → 'cultural heritage local tradition festival community'
+    ✓ 'yên tĩnh' → 'quiet peaceful tranquil secluded serene silent'
+    ✓ 'cặp đôi' → 'romantic couple private intimate sunset scenic'
+    ✓ 'check-in' → 'scenic photogenic viewpoint instagram aesthetic'
+
+  Output vector: dim=0, sample=[]
+
+────────────────────────────────────────────────────────────────
+  Sample 2: Solo — adventure off the beaten path
+────────────────────────────────────────────────────────────────
+  text  : I'm bored and want something completely new. Looking for an adventure, maybe off...
+  tags  : ['núi', 'cắm trại', 'leo núi', 'adventure', 'stargazing']
+[Embedder] Error: 'sentence-transformers' not installed.
+
+  Signals detected:
+    [emotion] 'bored' → 'entertainment activities nightlife adventure variety st...'
+  Tag expansions:
+    ✓ 'núi' → 'mountain highland altitude peak summit trail'
+    ✓ 'cắm trại' → 'camping outdoor wilderness nature campfire stars'
+    ✓ 'leo núi' → 'mountain trekking hiking summit trail climbing'
+    ~ 'adventure' → 'adventure'
+    ✓ 'stargazing' → 'stargazing dark-sky astronomy rural night'
+
+  Output vector: dim=0, sample=[]
+
+────────────────────────────────────────────────────────────────
+  Sample 3: Family — beach weekend with kids
+────────────────────────────────────────────────────────────────
+  text  : Gia đình tôi muốn đi chơi cuối tuần, có trẻ nhỏ nên cần nơi an toàn. Các bé thíc...
+  tags  : ['biển', 'gia đình có trẻ em', 'vui vẻ', 'resort']
+[Embedder] Error: 'sentence-transformers' not installed.
+
+  Signals detected:
+    [context] 'cuối tuần' → 'short-trip nearby compact weekend getaway...'
+    [context] 'gia đình' → 'family kid-friendly safe educational activities...'
+    [context] 'sunny' → 'beach outdoor picnic clear-sky sunshine scenic...'
+    [context] 'family' → 'family kid-friendly safe educational comfortable...'
+  Tag expansions:
+    ✓ 'biển' → 'beach coastal sea ocean surf wave sand'
+    ~ 'gia đình có trẻ em' → 'gia đình có trẻ em'
+    ✓ 'vui vẻ' → 'fun lively cheerful social activities entertainment'
+    ✓ 'resort' → 'resort luxury pool beachfront amenities'
+
+  Output vector: dim=0, sample=[]
+
+================================================================
+  VECTOR SUMMARY
+================================================================
+  Couple — peaceful nature + culture
+    dim=0  first_5=[]  last_3=[]
+  Solo — adventure off the beaten path
+    dim=0  first_5=[]  last_3=[]
+  Family — beach weekend with kids
+    dim=0  first_5=[]  last_3=[]
+
+[Output] JSON saved → C:\Users\Khanh\source\repos\travel-rec-system\backend\modules\n1_embedding\test\n1_output.json
+================================================================
+Press any key to continue . . .

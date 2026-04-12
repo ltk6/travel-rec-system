@@ -12,30 +12,37 @@ Drop-in alternatives (change MODEL_NAME only):
 """
 
 from __future__ import annotations
-import hashlib
-import math
 
 MODEL_NAME = "BAAI/bge-m3"
 
+_MODEL = None
 
-def load_model(model_name: str = MODEL_NAME):
-    """Load SentenceTransformer model."""
-    try:
-        from sentence_transformers import SentenceTransformer
-        print(f"[Embedder] Loading '{model_name}' ...")
-        model = SentenceTransformer(model_name)
-        print(f"[Embedder] Ready. Max seq length: {model.max_seq_length}")
-        return model
-    except ImportError:
-        print("[Embedder] sentence-transformers not installed.")
-        return None
-    except Exception as e:
-        print(f"[Embedder] Load failed ({e}).")
-        return None
+def get_model():
+    """
+    Returns the globally cached model. 
+    Loads it on the first call (Lazy Loading).
+    """
+    global _MODEL
+    if _MODEL is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            print(f"[Embedder] Loading '{MODEL_NAME}' into memory...")
+            _MODEL = SentenceTransformer(MODEL_NAME)
+            print(f"[Embedder] Ready. Device: {_MODEL.device}")
+        except ImportError:
+            print("[Embedder] Error: 'sentence-transformers' not installed.")
+        except Exception as e:
+            print(f"[Embedder] Load failed: {e}")
+    return _MODEL
 
-
-def _embed_text(text: str, model) -> list[float]:
-    """Convert a string to a normalized vector."""
+def embed_text(text: str) -> list[float]:
+    """
+    Convert a string to a normalized vector using the global model.
+    Returns an empty list if the model fails to load.
+    """
+    model = get_model()
     if model is not None:
+        # BGE-M3 works best with normalized embeddings for cosine similarity
         vec = model.encode(text, normalize_embeddings=True)
         return vec.tolist()
+    return []
