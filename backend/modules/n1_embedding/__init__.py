@@ -18,7 +18,7 @@ Public API
 
 from __future__ import annotations
 
-from .embedder     import embed_text, get_model
+from .embedder     import embed_text
 from .preprocessor import build_enriched_text
 from .maps         import stats as map_stats
 
@@ -49,4 +49,4 @@ def embed(data: dict) -> dict:
     return {"vector": vector}
 
 
-__all__ = ["embed", "get_model", "map_stats"]
+__all__ = ["embed", "map_stats"]

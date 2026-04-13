@@ -1,3 +1,8 @@
+[Embedder] Getting 'BAAI/bge-m3'
+[Embedder] Loading 'BAAI/bge-m3' into memory...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits andfaster downloads.
+Loading weights: 100%|██████████| 391/391 [00:00<00:00, 7353.61it/s]
+[Embedder] Ready. Device: cpu
 ================================================================
   N1 – TEXT EMBEDDING MODULE  |  Demo
 ================================================================
@@ -13,7 +18,6 @@
 ────────────────────────────────────────────────────────────────
   text  : Tôi muốn một chuyến đi yên tĩnh, gần thiên nhiên, có thể khám phá văn hóa địa ph...
   tags  : ['thiên nhiên', 'văn hóa', 'yên tĩnh', 'cặp đôi', 'check-in']
-[Embedder] Error: 'sentence-transformers' not installed.
 
   Signals detected:
     [emotion] 'căng thẳng' → 'relaxation nature tranquil meditation wellness retreat ...'
@@ -24,14 +28,13 @@
     ✓ 'cặp đôi' → 'romantic couple private intimate sunset scenic'
     ✓ 'check-in' → 'scenic photogenic viewpoint instagram aesthetic'
 
-  Output vector: dim=0, sample=[]
+  Output vector: dim=1024, sample=[-0.0327, 0.0101, -0.0523, -0.0236, -0.0035]
 
 ────────────────────────────────────────────────────────────────
   Sample 2: Solo — adventure off the beaten path
 ────────────────────────────────────────────────────────────────
   text  : I'm bored and want something completely new. Looking for an adventure, maybe off...
   tags  : ['núi', 'cắm trại', 'leo núi', 'adventure', 'stargazing']
-[Embedder] Error: 'sentence-transformers' not installed.
 
   Signals detected:
     [emotion] 'bored' → 'entertainment activities nightlife adventure variety st...'
@@ -42,14 +45,13 @@
     ~ 'adventure' → 'adventure'
     ✓ 'stargazing' → 'stargazing dark-sky astronomy rural night'
 
-  Output vector: dim=0, sample=[]
+  Output vector: dim=1024, sample=[-0.0133, -0.011, -0.0755, -0.0188, -0.0174]
 
 ────────────────────────────────────────────────────────────────
   Sample 3: Family — beach weekend with kids
 ────────────────────────────────────────────────────────────────
   text  : Gia đình tôi muốn đi chơi cuối tuần, có trẻ nhỏ nên cần nơi an toàn. Các bé thíc...
   tags  : ['biển', 'gia đình có trẻ em', 'vui vẻ', 'resort']
-[Embedder] Error: 'sentence-transformers' not installed.
 
   Signals detected:
     [context] 'cuối tuần' → 'short-trip nearby compact weekend getaway...'
@@ -62,17 +64,17 @@
     ✓ 'vui vẻ' → 'fun lively cheerful social activities entertainment'
     ✓ 'resort' → 'resort luxury pool beachfront amenities'
 
-  Output vector: dim=0, sample=[]
+  Output vector: dim=1024, sample=[-0.0263, -0.0108, -0.0815, -0.0297, -0.0357]
 
 ================================================================
   VECTOR SUMMARY
 ================================================================
   Couple — peaceful nature + culture
-    dim=0  first_5=[]  last_3=[]
+    dim=1024  first_5=[-0.0327, 0.0101, -0.0523, -0.0236, -0.0035]  last_3=[-0.036, -0.0138, -0.0218]
   Solo — adventure off the beaten path
-    dim=0  first_5=[]  last_3=[]
+    dim=1024  first_5=[-0.0133, -0.011, -0.0755, -0.0188, -0.0174]  last_3=[-0.0183, 0.0005, 0.0049]
   Family — beach weekend with kids
-    dim=0  first_5=[]  last_3=[]
+    dim=1024  first_5=[-0.0263, -0.0108, -0.0815, -0.0297, -0.0357]  last_3=[0.0134, -0.0213, -0.0587]
 
 [Output] JSON saved → C:\Users\Khanh\source\repos\travel-rec-system\backend\modules\n1_embedding\test\n1_output.json
 ================================================================
