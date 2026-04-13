@@ -1,0 +1,7 @@
+﻿# --- Project Global ---
+numpy>=1.24.0
+python-dotenv
+pydantic>=2.0.0
+
+# --- Module Recursive Imports ---
+-r backend/modules/n1_embedding/requirements.txt
