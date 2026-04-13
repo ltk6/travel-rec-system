@@ -1,0 +1,13 @@
+﻿# --- Model Execution ---
+sentence-transformers>=3.0.1
+torch>=2.0.0
+transformers>=4.36.0
+accelerate>=0.26.0
+
+# --- Tokenization (Required for BGE-M3) ---
+sentencepiece
+protobuf
+
+# --- Storage ---
+hf-xet>=1.4.0
+hf_transfer
