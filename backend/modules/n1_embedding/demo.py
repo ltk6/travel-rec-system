@@ -13,13 +13,15 @@ import json
 import sys
 import os
 
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+
 _here   = os.path.dirname(os.path.abspath(__file__))
 _parent = os.path.dirname(_here)
 if _parent not in sys.path:
     sys.path.insert(0, _parent)
 
-from n1_embedding import embed, load_model, map_stats
-from n1_embedding.maps import scan_text, expand_tags
+from n1_embedding import *
+from n1_embedding.maps import *
 
 
 # ─────────────────────────────────────────────────────────────
@@ -88,8 +90,6 @@ def run():
     print("=" * 64)
     print(map_stats())
 
-    model = load_model()
-
     records = []
 
     for i, sample in enumerate(SAMPLES, 1):
@@ -103,7 +103,7 @@ def run():
         print(f"  tags  : {data['tags']}")
 
         # ── Call the module's public function
-        result = embed(data, model=model)
+        result = embed(data)
         vector = result["vector"]
 
         # ── Show what the maps matched
@@ -140,7 +140,7 @@ def run():
               f"last_3={[round(x, 4) for x in v[-3:]]}")
 
     # ── JSON output
-    output_path = os.path.join(_here, "n1_output.json")
+    output_path = os.path.join(_here, "test", "n1_output.json")
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump({"module": "N1", "model": "BAAI/bge-m3", "samples": records},
                   f, ensure_ascii=False, indent=2)

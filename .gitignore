@@ -208,12 +208,6 @@ __marimo__/
 
 # Visual Studio
 .vs/
-<<<<<<< HEAD
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-=======
 *.user
 *.suo
 *.userosscache
@@ -230,4 +224,3 @@ obj/
 
 # Rider (optional if mixed)
 .idea/
->>>>>>> 2932740d4dc5836d823f18f2cfd68b4634f28b77
