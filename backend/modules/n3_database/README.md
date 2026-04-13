@@ -18,4 +18,4 @@ N3 sử dụng `python-dotenv` để ẩn chuỗi kết nối an toàn.
 ## 4. Cách chạy Unit Test (Mocking)
 N3 sử dụng `unittest.mock` để giả lập Database. 
 ```bash
-python -m unittest test_n3_db_manager.py -v
+python -m unittest test_n3.py -v

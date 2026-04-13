@@ -1,9 +1,9 @@
 ﻿import unittest
 from unittest.mock import patch, MagicMock
-from n3_db_manager import save_user_profile, filter_locations
+from db_manager import save_user_profile, filter_locations
 
 class TestN3DatabaseManager(unittest.TestCase):
-    @patch('n3_db_manager._get_db')
+    @patch('db_manager._get_db')
     def test_save_user_profile(self, mock_get_db):
         mock_db = MagicMock()
         mock_get_db.return_value = mock_db
@@ -12,7 +12,7 @@ class TestN3DatabaseManager(unittest.TestCase):
         res = save_user_profile({"user_id": "U01", "vector": [0.1]})
         self.assertEqual(res["status"], "success")
 
-    @patch('n3_db_manager._get_db')
+    @patch('db_manager._get_db')
     def test_filter_locations_logic(self, mock_get_db):
         mock_db = MagicMock()
         mock_get_db.return_value = mock_db
