@@ -208,7 +208,26 @@ __marimo__/
 
 # Visual Studio
 .vs/
+<<<<<<< HEAD
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
+=======
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+bin/
+obj/
+
+# Visual Studio cache
+*.cache
+*.pdb
+*.ilk
+
+# Rider (optional if mixed)
+.idea/
+>>>>>>> 694f15b294cf65233566120a4d770895d3395d26
