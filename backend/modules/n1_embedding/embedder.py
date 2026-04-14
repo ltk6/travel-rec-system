@@ -35,6 +35,10 @@ def get_model():
             print(f"[Embedder] Load failed: {e}")
     return _MODEL
 
+# Load model once upon import
+print(f"[Embedder] Getting '{MODEL_NAME}'")
+get_model()
+
 def embed_text(text: str) -> list[float]:
     """
     Convert a string to a normalized vector using the global model.
