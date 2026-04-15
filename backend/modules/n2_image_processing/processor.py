@@ -29,8 +29,22 @@ def process_image(data: dict) -> dict:
             img = img.convert('RGB')
 
         prompt = """
-        Bạn là chuyên gia phân tích du lịch. Hãy miêu tả bức ảnh này bằng 1 đoạn văn ngắn gọn (2-3 câu).
-        Bắt buộc phải có: Loại hình địa điểm, Kiến trúc hoặc Cảnh quan, và Không khí mang lại.
+        [Context]: Bạn là một chuyên gia phân tích dữ liệu du lịch chuyên nghiệp.
+        [Task]: Hãy phân tích hình ảnh được cung cấp để trích xuất các đặc trưng ngữ nghĩa phục vụ cho hệ thống gợi ý điểm đến.
+        
+        [Constraints]: Đoạn mô tả phải tập trung vào 3 yếu tố cốt lõi:
+        1. Loại hình địa điểm (Ví dụ: bãi biển, đền chùa, quán cafe, công viên...).
+        2. Kiến trúc hoặc Cảnh quan (Ví dụ: phong cách hiện đại, cổ kính, rừng nguyên sinh...).
+        3. Không khí mang lại (Ví dụ: yên bình, náo nhiệt, hùng vĩ, ấm cúng...).
+
+        [Noise Reduction]: 
+        - Tuyệt đối KHÔNG mô tả các chi tiết vụn vặt không liên quan đến du lịch như: biển số xe, màu sắc trang phục của người đi đường, nhãn hiệu đồ dùng cá nhân, hoặc các nhiễu động trong khung hình.
+        - Không có lời dẫn (ví dụ: "Trong ảnh là...", "Tôi thấy...") và không có lời kết.
+
+        [Format Enforcement]: 
+        - Kết quả phải là MỘT ĐOẠN VĂN DUY NHẤT.
+        - Độ dài tối đa từ 2 ĐẾN 3 CÂU.
+        - Ngôn ngữ: Tiếng Việt.
         """
         
         result = model.generate_content([prompt, img])
