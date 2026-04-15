@@ -1,0 +1,23 @@
+# N8 — API Orchestrator Dependencies
+
+# Web framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# HTTP client async (để gọi N2 service)
+httpx>=0.27.0
+
+# Validation
+pydantic>=2.0.0
+
+# Môi trường
+python-dotenv>=1.0.0
+
+# N1 — Text Embedding (nếu chạy cùng project)
+sentence-transformers>=2.7.0
+
+# N3 — Database
+pymongo>=4.7.0
+
+# N6 — Ranking
+numpy>=1.24.0
