@@ -1,14 +1,9 @@
-﻿from db_manager import save_location, _get_db
+﻿from db_manager import init_db, save_location
 
 def seed_database():
-    db = _get_db()
-    if db is None:
-        print(" Lỗi: Không thể kết nối DB để bơm dữ liệu!")
-        return
-
-    print(" Đang dọn dẹp bảng locations...")
-    db.locations.drop()
-
+    # Bước cực kỳ quan trọng đối với PostgreSQL: Tạo bảng trước
+    init_db()
+    
     locations = [
         {"location_id": "loc_001", "vector": [0.12, 0.85, 0.45, 0.1, 0.9], "metadata": {"name": "Bãi Sau Vũng Tàu", "description": "Biển nhộn nhịp", "tags": ["beach", "vibrant"], "price_level": 1500000, "estimated_duration": 1}, "geo": {"lat": 10.34, "lng": 107.08}},
         {"location_id": "loc_002", "vector": [0.75, 0.15, 0.9, 0.3, 0.2], "metadata": {"name": "Đỉnh Langbiang Đà Lạt", "description": "Nóc nhà Đà Lạt", "tags": ["mountain", "nature"], "price_level": 800000, "estimated_duration": 1}, "geo": {"lat": 12.04, "lng": 108.42}},
@@ -32,10 +27,10 @@ def seed_database():
         {"location_id": "loc_020", "vector": [0.3, 0.4, 0.5, 0.6, 0.7], "metadata": {"name": "Đảo Lý Sơn", "description": "Vương quốc tỏi", "tags": ["beach", "island"], "price_level": 2500000, "estimated_duration": 2}, "geo": {"lat": 15.38, "lng": 109.11}}
     ]
 
-    print(f" Đang bơm {len(locations)} địa điểm lên Cloud...")
+    print(f"🚀 N3: Đang bơm {len(locations)} địa điểm vào PostgreSQL...")
     for loc in locations:
         save_location(loc)
-    print(" HOÀN TẤT!")
+    print("✨ Hoàn thành nạp dữ liệu!")
 
 if __name__ == "__main__":
     seed_database()
