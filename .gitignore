@@ -1,0 +1,14 @@
+.env
+
+
+venv/
+.venv/
+env/
+
+
+__pycache__/
+*.pyc.vscode/
+.idea/
+
+# 5. Dữ liệu tạm hoặc log
+*.log

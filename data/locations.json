@@ -1,0 +1,43 @@
+[
+    {
+        "id": "sapa",
+        "name": "Sa Pa",
+        "tags": [
+            "mountain",
+            "nature",
+            "cool_weather",
+            "culture"
+        ],
+        "best_months": [
+            3,
+            4,
+            5,
+            9,
+            10,
+            11
+        ],
+        "popularity": 0.9,
+        "province": "Lào Cai",
+        "description": "Thị trấn sương mù với ruộng bậc thang."
+    },
+    {
+        "id": "phuquoc",
+        "name": "Phú Quốc",
+        "tags": [
+            "beach",
+            "nature",
+            "food"
+        ],
+        "best_months": [
+            11,
+            12,
+            1,
+            2,
+            3,
+            4
+        ],
+        "popularity": 0.95,
+        "province": "Kiên Giang",
+        "description": "Đảo ngọc với bãi biển trắng mịn."
+    }
+]
