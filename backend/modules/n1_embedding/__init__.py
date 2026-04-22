@@ -1,10 +1,20 @@
 ﻿"""
 n1_module
 =========
-N1 – Text Embedding Module
+
+Unified embedding API for user and location inputs.
+
+Each input is processed independently through a structured semantic pipeline:
+→ registry expansion (emotion / context / tags / image)
+→ channel-wise enriched representation
+→ multi-vector embedding using a shared model
+
+This ensures consistent semantic representation across user queries
+and location documents for retrieval and ranking.
 
 Public API
 ----------
+
     from n1_embedding import embed
 
     result = embed({
@@ -13,40 +23,86 @@ Public API
         "tags": ["thiên nhiên", "yên tĩnh", "couple"]
     })
 
-    print(result["vector"])   # list[float], 1024-dim
+    print(result["type"])                 # "user" | "location"
+    print(result["vectors"]["context"])   # list[float], 1024-dim
 """
 
 from __future__ import annotations
 
-from .embedder     import embed_text
-from .preprocessor import build_enriched_text
-from .maps         import stats as map_stats
+from typing import Dict, Any, List
+
+from .embedder import embed_texts
+from .preprocessor import build_user_input, build_location_input
+from .maps import stats as map_stats
 
 
-def embed(data: dict) -> dict:
+def embed(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    N1 main function — as specified by the system interface contract.
+    Unified embedding API (SINGLE INPUT ONLY)
 
-    Parameters
-    ----------
-    data : dict with keys:
-        "text"              (str)       Free-text requirement, vi/en/mixed.
-        "image_description" (str)       Plain English description from N2.
-        "tags"              (list[str]) Quiz/user tags, vi/en/mixed.
+    Input:
+        USER:
+        {
+            "text": str,
+            "image_description": str,
+            "tags": list[str]
+        }
 
-    Returns
-    -------
-    dict:
-        "vector" : list[float]  Normalized 1024-dim embedding vector.
+        LOCATION:
+        {
+            "description": str,
+            "tags": list[str]
+        }
+
+    Output:
+        {
+            "type": "user" | "location",
+            "vectors": {
+                "expanded_emotion": [...],
+                "expanded_context": [...],
+                "expanded_tag": [...],
+                "expanded_image": [...]
+            }
+        }
     """
-    text              = data.get("text", "")
-    image_description = data.get("image_description", "")
-    tags              = data.get("tags", [])
 
-    enriched = build_enriched_text(text, image_description, tags)
-    vector   = embed_text(enriched)
+    if not isinstance(data, dict):
+        raise ValueError("embed() now only accepts a single dict")
 
-    return {"vector": vector}
+    # ─────────────────────────────────────────────
+    # 1. detect type
+    # ─────────────────────────────────────────────
+    is_location = "description" in data
+
+    if is_location:
+        processed = build_location_input(
+            description=data.get("description", ""),
+            tags=data.get("tags", []),
+        )
+        input_type = "location"
+    else:
+        processed = build_user_input(
+            text=data.get("text", ""),
+            image_description=data.get("image_description", ""),
+            tags=data.get("tags", []),
+        )
+        input_type = "user"
+
+    # ─────────────────────────────────────────────
+    # 2. embed each semantic channel
+    # ─────────────────────────────────────────────
+    keys = list(processed.keys())
+    texts = [processed[k] for k in keys]
+
+    vectors = embed_texts(texts)
+
+    # ─────────────────────────────────────────────
+    # 3. return clean structure (NO IDs)
+    # ─────────────────────────────────────────────
+    return {
+        "type": input_type,
+        "vectors": dict(zip(keys, vectors))
+    }
 
 
 __all__ = ["embed", "map_stats"]
