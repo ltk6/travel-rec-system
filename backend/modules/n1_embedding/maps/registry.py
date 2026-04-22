@@ -1,84 +1,140 @@
-﻿"""
+"""
 maps/registry.py
 ================
-Unified registry for all keyword maps.
-Exposes a single lookup API used by the preprocessor.
 
-Three active maps:
-  - tags     : vi/en tag → enriched English travel keywords
-  - emotions : emotional state → travel style keywords
-  - context  : season/weather + social group → travel keywords
+Core keyword registry and semantic extraction engine for N8 preprocessing.
+
+This module provides high-performance lookup and matching for:
+- Emotion signals (user mood → travel intent keywords)
+- Context signals (situational constraints → grounding keywords)
+- Tag signals (explicit user preferences → travel descriptors)
+
+It is responsible ONLY for extraction and expansion.
+It does NOT build embeddings or final vectors.
+
+─────────────────────────────────────────────────────────────
+SECTION INDEX
+─────────────────────────────────────────────────────────────
+  A. MAP REGISTRATION   — load and normalize emotion/context/tag maps
+  B. LOOKUP TABLES      — lowercased high-speed dictionaries
+  C. MATCH RESULT TYPE  — structured match output (source, key, expansion)
+  D. TEXT SCANNING      — emotion + context extraction with deduplication
+  E. TAG EXPANSION      — tag normalization and enrichment
+  F. UTILITIES          — stats + internal helpers
+
+REGISTRY COVERAGE
+─────────────────────────────────────────────────────────────
+  • EMOTIONS : maps free-text mood → semantic travel intent keywords
+  • CONTEXT  : maps situational cues → travel constraint/setting keywords
+  • TAGS     : maps explicit user preferences → curated travel descriptors
 """
 
 from __future__ import annotations
 from typing import NamedTuple
 
 from .emotions import ALL_EMOTIONS
-from .tags     import ALL_TAGS
-from .context  import ALL_CONTEXT
-
+from .tags import ALL_TAGS
+from .context import ALL_CONTEXT
 
 # ── Build lowercased lookup tables once at import
 _EMOTIONS: dict[str, str] = {k.lower().strip(): v for k, v in ALL_EMOTIONS.items()}
 _TAGS:     dict[str, str] = {k.lower().strip(): v for k, v in ALL_TAGS.items()}
 _CONTEXT:  dict[str, str] = {k.lower().strip(): v for k, v in ALL_CONTEXT.items()}
 
-# Full-text scan map (emotions + context only — tags operate on a list)
-_FULLTEXT: dict[str, str] = {**_EMOTIONS, **_CONTEXT}
-
-
 class MatchResult(NamedTuple):
     source:    str   # "emotion" | "context" | "tag" | "tag_passthrough"
     key:       str   # phrase that matched
     expansion: str   # travel keywords produced
 
+# ── Internal: dedupe substrings (prefer longer phrases) ─────
+def _dedupe_substrings(matches: list[MatchResult]) -> list[MatchResult]:
+    matches_sorted = sorted(matches, key=lambda m: len(m.key), reverse=True)
+
+    kept: list[MatchResult] = []
+
+    for m in matches_sorted:
+        if not any(m.key in k.key for k in kept):
+            kept.append(m)
+
+    return kept
 
 # ─────────────────────────────────────────────────────────────
 # PUBLIC API
 # ─────────────────────────────────────────────────────────────
 
-def scan_text(text: str) -> list[MatchResult]:
+def scan_text(text: str) -> dict[str, list[MatchResult]]:
     """
-    Scan free text (user_text or image_description) against
-    emotion and context maps. Returns all matches found.
+    Scan free text into structured channels:
+        {
+            "emotion": [...],
+            "context": [...]
+        }
+
+    • Simple substring scan
+    • Post-deduplication (longest match wins)
     """
-    normed  = text.lower().strip()
-    results: list[MatchResult] = []
+    normed = text.lower().strip()
 
-    for key, expansion in _EMOTIONS.items():
-        if key in normed:
-            results.append(MatchResult("emotion", key, expansion))
+    emotion_results = [
+        MatchResult("emotion", key, _EMOTIONS[key])
+        for key in _EMOTIONS
+        if key in normed
+    ]
 
-    for key, expansion in _CONTEXT.items():
-        if key in normed:
-            results.append(MatchResult("context", key, expansion))
+    context_results = [
+        MatchResult("context", key, _CONTEXT[key])
+        for key in _CONTEXT
+        if key in normed
+    ]
 
-    return results
+    return {
+        "emotion": _dedupe_substrings(emotion_results),
+        "context": _dedupe_substrings(context_results),
+    }
 
 
-def expand_tags(tags: list[str]) -> list[MatchResult]:
+def expand_tags(tags: list[str]) -> dict[str, list[MatchResult]]:
     """
-    Translate/expand a list of tags.
-    Known tags → enriched English keywords.
-    Unknown tags → passed through unchanged.
+    Expand tags into:
+        {
+            "tag": [...],
+            "tag_passthrough": [...]
+        }
     """
-    results: list[MatchResult] = []
+    expanded: list[MatchResult] = []
+    passthrough: list[MatchResult] = []
+
     for tag in tags:
         key = tag.lower().strip()
-        if key in _TAGS:
-            results.append(MatchResult("tag", tag, _TAGS[key]))
-        else:
-            results.append(MatchResult("tag_passthrough", tag, tag))
-    return results
 
+        if key in _TAGS:
+            expanded.append(MatchResult("tag", tag, _TAGS[key]))
+        else:
+            passthrough.append(MatchResult("tag_passthrough", tag, tag))
+
+    return {
+        "tag": expanded,
+        "tag_passthrough": passthrough,
+    }
 
 def stats() -> str:
+    """
+    Simple registry stats overview.
+    """
+
+    emotions = len(_EMOTIONS)
+    tags     = len(_TAGS)
+    context  = len(_CONTEXT)
+    total    = emotions + tags + context
+
     lines = [
-        "── Map Registry ────────────────────────",
-        f"  Emotions  : {len(_EMOTIONS):>3} entries",
-        f"  Tags      : {len(_TAGS):>3} entries",
-        f"  Context   : {len(_CONTEXT):>3} entries",
-        f"  Total     : {len(_EMOTIONS) + len(_TAGS) + len(_CONTEXT):>3} entries",
-        "────────────────────────────────────────",
+        "── Map Registry ─────────────────────────────────────────",
+        f"  Emotions : {emotions:>3}",
+        f"  Tags     : {tags:>3}",
+        f"  Context  : {context:>3}",
+        "  ─────────────────────────────────────────────────────",
+        f"  Total    : {total:>3}",
+        "─────────────────────────────────────────────────────────",
     ]
+
     return "\n".join(lines)
