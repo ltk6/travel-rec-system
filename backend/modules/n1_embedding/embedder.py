@@ -54,26 +54,52 @@ print(f"[Embedder] Initializing '{MODEL_NAME}'")
 get_model()
 
 
-def embed_texts(texts: List[str]) -> List[List[float]]:
-    """
-    Convert a list of strings into a list of normalized vectors.
+from typing import List, Optional
 
-    Input:
-        ["text A", "text B", ...]
-
-    Output:
-        [[1024-dim vector], [1024-dim vector], ...]
+def embed_texts(texts: List[str]) -> List[Optional[List[float]]]:
     """
+    Convert list of strings into embeddings.
+
+    Empty or whitespace-only strings → None
+    """
+
     model = get_model()
 
     if model is None or not texts:
         return []
 
+    # ─────────────────────────────
+    # 1. Normalize + mark empty
+    # ─────────────────────────────
+    cleaned_texts: List[str] = []
+    index_map: List[int] = []
+
+    for i, t in enumerate(texts):
+        if t is None or not t.strip():
+            continue
+        cleaned_texts.append(t)
+        index_map.append(i)
+
+    # if everything is empty
+    if not cleaned_texts:
+        return [None] * len(texts)
+
+    # ─────────────────────────────
+    # 2. Embed only valid texts
+    # ─────────────────────────────
     vectors = model.encode(
-        texts,
+        cleaned_texts,
         normalize_embeddings=True,
         batch_size=32,
         show_progress_bar=False,
-    )
+    ).tolist()
 
-    return vectors.tolist()
+    # ─────────────────────────────
+    # 3. Reconstruct full output with None gaps
+    # ─────────────────────────────
+    output: List[Optional[List[float]]] = [None] * len(texts)
+
+    for vec, idx in zip(vectors, index_map):
+        output[idx] = vec
+
+    return output

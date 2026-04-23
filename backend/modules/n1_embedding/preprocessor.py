@@ -15,18 +15,18 @@ Each channel is independently expanded using the shared semantic registry
 USER OUTPUT STRUCTURE
 ────────────────────────────────────────────────────────────
 {
-    "expanded_emotion": str,   # text + emotion expansions
-    "expanded_context": str,   # text + context expansions
-    "expanded_tag": str,       # tag-derived keywords
-    "expanded_image": str      # image + visual semantic expansions
+    "expanded_emotion": str,   # emotion expansions
+    "expanded_context": str,   # context expansions
+    "expanded_tag": str,       # tag expansions
+    "expanded_image": str      # image description + visual keyword expansions
 }
 
 ────────────────────────────────────────────────────────────
 LOCATION OUTPUT STRUCTURE
 ────────────────────────────────────────────────────────────
 {
-    "expanded_semantic": str,  # description + emotion + context expansions
-    "expanded_tag": str        # location tags only
+    "expanded_text": str,       # description + emotion + context expansions
+    "expanded_tag": str         # location tags expansions
 }
 """
 
@@ -36,10 +36,6 @@ from .maps import *
 
 
 def _dedupe(items: list[str]) -> list[str]:
-    """
-    Remove duplicates while preserving order.
-    Filters empty values and prioritizes first occurrence.
-    """
     seen: set[str] = set()
     out: list[str] = []
     for item in items:
@@ -56,20 +52,7 @@ def _flatten(matches: list[MatchResult]) -> list[str]:
     return [m.expansion for m in matches]
 
 
-def build_user_input(
-    text: str,
-    image_description: str,
-    tags: list[str],
-) -> dict[str, str]:
-    """
-    Build user-side multi-channel embedding input.
-
-    Channels:
-    - emotion: intent + emotional expansion
-    - context: situational expansion
-    - tag: explicit preference signals
-    - image: visual intent expansion
-    """
+def build_user_input(text: str, image_description: str, tags: list[str]) -> dict[str, str]:
 
     base_text = text.strip()
 
@@ -81,8 +64,14 @@ def build_user_input(
     emotion_kw = _dedupe(_flatten(text_scan["emotion"]))
     context_kw = _dedupe(_flatten(text_scan["context"]))
 
-    expanded_emotion = " ".join([base_text] + emotion_kw) if base_text else " ".join(emotion_kw)
-    expanded_context = " ".join([base_text] + context_kw) if base_text else " ".join(context_kw)
+    expanded_emotion = " ".join(emotion_kw)
+    expanded_context = " ".join(context_kw)
+
+    if not emotion_kw:
+        expanded_emotion = ""
+
+    if not context_kw:
+        expanded_context = ""
 
     # ─────────────────────────────
     # 2. TAGS → independent signal
@@ -90,7 +79,7 @@ def build_user_input(
     tag_scan = expand_tags(tags)
     tag_kw = _dedupe(_flatten(tag_scan["tag"]))
 
-    expanded_tag = " ".join(tag_kw)
+    expanded_tag = " ".join(tag_kw) if tag_kw else ""
 
     # ─────────────────────────────
     # 3. IMAGE → independent visual channel
@@ -119,13 +108,6 @@ def build_user_input(
 
 
 def build_location_input(description: str, tags: list[str]) -> dict[str, str]:
-    """
-    Build location-side embedding representation.
-
-    The location is treated as a document entity:
-    - semantic channel = description + emotion/context expansions
-    - tag channel = explicit structured tags
-    """
 
     # ─────────────────────────────
     # 1. DESCRIPTION → semantic expansion
@@ -135,21 +117,26 @@ def build_location_input(description: str, tags: list[str]) -> dict[str, str]:
     emotion_kw = _dedupe(_flatten(text_scan["emotion"]))
     context_kw = _dedupe(_flatten(text_scan["context"]))
 
-    expanded_semantic = description.strip()
+    expanded_emotion = " ".join(emotion_kw) if emotion_kw else ""
+    expanded_context = " ".join(context_kw) if context_kw else ""
+
+    expanded_text = description.strip()
 
     if emotion_kw:
-        expanded_semantic += " " + " ".join(emotion_kw)
+        expanded_text += " " + " ".join(emotion_kw)
 
     if context_kw:
-        expanded_semantic += " " + " ".join(context_kw)
+        expanded_text += " " + " ".join(context_kw)
 
     # ─────────────────────────────
     # 2. TAGS → explicit structured signal
     # ─────────────────────────────
     tag_scan = expand_tags(tags)
-    expanded_tag = " ".join(_flatten(tag_scan["tag"]))
+    tag_kw = _dedupe(_flatten(tag_scan["tag"]))
+
+    expanded_tag = " ".join(tag_kw) if tag_kw else ""
 
     return {
-        "expanded_semantic": expanded_semantic,
+        "expanded_text": expanded_text,
         "expanded_tag": expanded_tag,
     }

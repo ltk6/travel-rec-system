@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from typing import Any, Dict
 
-from n1_embedding import embed
+from . import embed
 
 
 # ─────────────────────────────────────────────
-# Pretty print
+# Pretty print (NONE SAFE)
 # ─────────────────────────────────────────────
 def pretty_print(result: dict):
     print("\n════════ EMBED RESULT ════════")
@@ -17,6 +17,12 @@ def pretty_print(result: dict):
     vectors = result["vectors"]
 
     for name, vec in vectors.items():
+
+        # IMPORTANT: handle missing channel
+        if vec is None:
+            print(f"\n[{name}] None (no signal)")
+            continue
+
         print(f"\n[{name}] dim={len(vec)}")
         print("head:", vec[:5])
 
@@ -24,26 +30,32 @@ def pretty_print(result: dict):
 
 
 # ─────────────────────────────────────────────
-# Save JSON
+# Save JSON (None-safe)
 # ─────────────────────────────────────────────
 def save_json(result: dict, filename: str):
-    payload = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "data": result
-    }
+    def sanitize(obj: Any):
+        if isinstance(obj, dict):
+            return {k: sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [sanitize(v) for v in obj]
+        if obj is None:
+            return None
+        return obj
+
+    payload = sanitize(result)
 
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
 
 
 # ─────────────────────────────────────────────
-# USER TEST (ONE INPUT ONLY)
+# USER TEST
 # ─────────────────────────────────────────────
 def test_user():
-    data = {
+    data: Dict[str, Any] = {
         "text": "Tôi muốn một chuyến đi yên tĩnh gần thiên nhiên",
-        "image_description": "Peaceful misty highland with wooden cabin",
-        "tags": ["thiên nhiên", "yên tĩnh", "couple"]
+        "image_description": "",
+        "tags": ["thiên nhiên", "yên tĩnh", "couple"],
     }
 
     result = embed(data)
@@ -56,9 +68,9 @@ def test_user():
 # LOCATION TEST
 # ─────────────────────────────────────────────
 def test_location():
-    data = {
+    data: Dict[str, Any] = {
         "description": "Busy coastal city with nightlife and beaches",
-        "tags": ["beach", "city", "nightlife"]
+        "tags": ["beach", "city", "nightlife"],
     }
 
     result = embed(data)
