@@ -1,114 +1,244 @@
 import streamlit as st
 import requests
+from PIL import Image
+import base64
 
-def run_ui():
-    st.set_page_config(page_title="Travel Experience Planner", page_icon="✈️", layout="wide")
-    st.title("🌍 Travel Experience Planner")
-    st.markdown("Hệ thống đề xuất trải nghiệm cá nhân hóa")
+st.set_page_config(page_title="Travel Questionnaire", page_icon="🧭", layout="centered")
 
-    # --- KHU VỰC 1: RÀNG BUỘC (SIDEBAR) ---
-    st.sidebar.header("⚙️ Ràng buộc thực tế")
-    budget = st.sidebar.number_input("Ngân sách tối đa (VNĐ)", min_value=0, value=5000000, step=100000)
-    duration = st.sidebar.number_input("Thời gian dự kiến (Giờ)", min_value=1, value=48, step=1)
-    people = st.sidebar.number_input("Số lượng người", min_value=1, value=2, step=1)
+st.title("🧭 Travel Questionnaire")
+st.markdown("20 questions + text + image → structured output for N1")
 
-    # --- KHU VỰC 2: NHẬP LIỆU (TABS) ---
-    tab1, tab2 = st.tabs(["📋 Trắc nghiệm sở thích", "✍️ Hình ảnh & Mô tả"])
-    
-    user_tags = []
+# ─────────────────────────────
+# QUESTIONS
+# ─────────────────────────────
+QUESTIONS = [
 
-    with tab1:
-        st.subheader("Hiểu hơn về chuyến đi của bạn")
-        q1 = st.radio("1. Bạn thích phong cách cảnh quan nào?", ["Hòa mình vào thiên nhiên", "Khám phá đô thị"])
-        if q1 == "Hòa mình vào thiên nhiên":
-            user_tags.append("thiên nhiên")
-            
-        q2 = st.radio("2. Nhịp độ chuyến đi bạn mong muốn?", ["Thư giãn, yên tĩnh", "Sôi động, náo nhiệt"])
-        if q2 == "Thư giãn, yên tĩnh":
-            user_tags.append("yên tĩnh")
-            
-        q3 = st.radio("3. Bạn đi cùng ai?", ["Đi cùng người yêu (Couple)", "Đi một mình / Bạn bè"])
-        if q3 == "Đi cùng người yêu (Couple)":
-            user_tags.append("couple")
-
-    with tab2:
-        st.subheader("Chi tiết bổ sung")
-        user_text = st.text_area("Bạn có yêu cầu đặc biệt gì không?", placeholder="VD: Muốn đi nơi mát mẻ...")
-        image_url_input = st.text_input("Đường dẫn (URL) hình ảnh nơi bạn muốn đến (Nếu có)", placeholder="https://example.com/anh.jpg")
-
-    # --- KHU VỰC 3: GỌI API N8 & HIỂN THỊ ---
-    if st.button("🚀 Tìm kiếm lộ trình", use_container_width=True):
-        
-        # 1. Gom JSON đúng Schema "RecommendRequest" của N8
-        payload_to_n8 = {
-            "preferences": {
-                "text": user_text,
-                "image_url": image_url_input if image_url_input.strip() != "" else None,
-                "tags": user_tags
-            },
-            "constraints": {
-                "budget": float(budget),
-                "duration": int(duration),
-                "people": int(people)
-            }
+    # ─────────────────────────────
+    # Q1 — SOCIAL
+    # ─────────────────────────────
+    {
+        "q": "Q1. Who is coming?",
+        "type": "radio",
+        "options": {
+            "Solo": ["solo", "independent", "flexible", "quiet", "self-paced", "free"],
+            "Couple": ["couple", "romantic", "intimate", "private", "together", "love"],
+            "Family": ["family", "kids", "safe", "stable", "comfortable", "easy"],
+            "Friends": ["group", "social", "lively", "fun", "shared", "active"]
         }
+    },
 
-        # 2. Gọi API N8
-        # N8 đang chạy mặc định ở port 8000
-        N8_API_URL = "http://localhost:8000/api/v1/recommend"
+    # ─────────────────────────────
+    # Q2 — DURATION
+    # ─────────────────────────────
+    {
+        "q": "Q2. Duration?",
+        "type": "radio",
+        "options": {
+            "1 day": ["short", "quick", "fast", "near", "simple", "light"],
+            "2–3 days": ["weekend", "balanced", "mid", "flexible", "short-trip", "easy"],
+            "1 week+": ["long", "deep", "slow", "extended", "immersive", "full"]
+        }
+    },
 
-        with st.spinner("Đang gửi dữ liệu đến N8 và phân tích lộ trình..."):
-            try:
-                response = requests.post(N8_API_URL, json=payload_to_n8)
-                
-                # N8 báo thành công
-                if response.status_code == 200:
-                    result_data = response.json()
-                    
-                    st.success(f"Hệ thống phân tích thành công trong {result_data.get('processing_time_ms', 0)}ms!")
-                    st.divider()
-                    st.subheader("🎯 Đề xuất dành cho bạn")
-                    
-                    # 3. Phân tách cục JSON Output chuẩn của N8
-                    recs = result_data.get("data", {}).get("recommendations", [])
-                    
-                    if not recs:
-                        st.warning("Hệ thống không tìm thấy lộ trình phù hợp với tiêu chí của bạn.")
-                    
-                    for index, rec in enumerate(recs):
-                        loc = rec.get("location", {})
-                        itinerary = rec.get("itinerary", {})
-                        
-                        with st.container():
-                            st.markdown(f"### Lựa chọn {index + 1}: {loc.get('name', 'Chưa có tên')}")
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.write(f"**Độ phù hợp (Match Score):** {loc.get('match_score', 0) * 100:.1f}%")
-                            with col2:
-                                st.metric("Tổng chi phí ước tính", f"{itinerary.get('total_cost', 0):,} VNĐ")
-                                st.metric("Tổng thời gian hoạt động", f"{itinerary.get('total_duration', 0)} phút")
-                            
-                            st.markdown("**Các hoạt động nổi bật (N5 & N6 đề xuất):**")
-                            activities = itinerary.get("activities", [])
-                            if not activities:
-                                st.write("- (Không có hoạt động nào được đề xuất)")
-                            else:
-                                for act in activities:
-                                    st.markdown(f"- 🏃 **{act.get('name')}** (Chi phí: {act.get('cost', 0):,} VNĐ | Thời gian: {act.get('duration', 0)} phút)")
-                                    if act.get('reason_summary'):
-                                        st.caption(f"  *Lý do: {act.get('reason_summary')}*")
-                            
-                            st.divider()
+    # ─────────────────────────────
+    # Q3 — DISTANCE
+    # ─────────────────────────────
+    {
+        "q": "Q3. Distance?",
+        "type": "radio",
+        "options": {
+            "Near": ["near", "local", "short-travel", "quick", "easy", "low-effort"],
+            "Domestic": ["domestic", "country", "regional", "accessible", "standard", "varied"],
+            "International": ["intl", "global", "far", "long", "diverse", "new"]
+        }
+    },
 
-                # N8 báo lỗi (Ví dụ: 422, 503, 400)
-                else:
-                    error_detail = response.json().get("detail", {})
-                    st.error(f"Lỗi từ hệ thống (Mã {response.status_code}):")
-                    st.json(error_detail)
+    # ─────────────────────────────
+    # Q4 — MOTIVATION
+    # ─────────────────────────────
+    {
+        "q": "Q4. Why travel?",
+        "type": "radio",
+        "options": {
+            "Rest": ["relax", "peace", "calm", "slow", "reset", "quiet"],
+            "Adventure": ["adventure", "explore", "active", "challenge", "movement", "excitement"],
+            "Culture": ["culture", "heritage", "local", "history", "learning", "city"],
+            "Romance": ["romantic", "love", "couple", "intimate", "private", "emotion"]
+        }
+    },
 
-            except requests.exceptions.ConnectionError:
-                st.error("🚨 Lỗi: Không thể kết nối tới N8!")
+    # ─────────────────────────────
+    # Q5 — ENVIRONMENT (CRITICAL)
+    # ─────────────────────────────
+    {
+        "q": "Q5. Environment?",
+        "type": "radio",
+        "options": {
+            "Beach": ["beach", "sea", "coastal", "sun", "island", "waves"],
+            "Mountain": ["mountain", "highland", "cool", "elevation", "hiking", "nature"],
+            "City": ["city", "urban", "modern", "buildings", "nightlife", "busy"],
+            "Nature": ["nature", "forest", "wild", "green", "fresh", "eco"],
+            "Resort": ["resort", "luxury", "comfort", "spa", "service", "relax"]
+        }
+    },
 
-if __name__ == "__main__":
-    run_ui()
+    # ─────────────────────────────
+    # Q6 — CULTURE LEVEL
+    {
+        "q": "Q6. Culture level?",
+        "type": "radio",
+        "options": {
+            "High": ["culture", "heritage", "history", "local", "deep", "tradition"],
+            "Mid": ["culture-lite", "light", "mixed", "casual", "some", "balanced"],
+            "Low": ["minimal", "none", "nature", "relax", "simple", "non-cultural"]
+        }
+    },
+
+    # ─────────────────────────────
+    # Q7 — CULTURE FOCUS
+    {
+        "q": "Q7. Cultural focus",
+        "type": "multi",
+        "options": {
+            "Food": ["food", "eat", "local", "street", "taste", "cuisine"],
+            "Temples": ["temple", "spiritual", "religion", "sacred", "heritage", "calm"],
+            "Markets": ["market", "street", "local", "shopping", "culture", "busy"],
+            "Art": ["art", "museum", "creative", "design", "culture", "visual"]
+        }
+    },
+
+    # ─────────────────────────────
+    # Q8 — ACTIVITY
+    {
+        "q": "Q8. Activity level?",
+        "type": "radio",
+        "options": {
+            "Active": ["active", "move", "sport", "outdoor", "energy", "adventure"],
+            "Moderate": ["balanced", "mid", "walk", "flexible", "normal", "steady"],
+            "Relaxed": ["relax", "slow", "rest", "calm", "easy", "low-energy"]
+        }
+    },
+
+    # ─────────────────────────────
+    # Q9 — ACTIVITIES
+    {
+        "q": "Q9. Activities",
+        "type": "multi",
+        "options": {
+            "Hiking": ["hiking", "trek", "mountain", "outdoor", "nature", "climb"],
+            "Swimming": ["swim", "water", "beach", "sea", "cool", "refresh"],
+            "Camping": ["camp", "night", "outdoor", "nature", "sleep", "wild"],
+            "Photo": ["photo", "view", "scenic", "capture", "aesthetic", "frame"]
+        }
+    },
+
+    # ─────────────────────────────
+    # Q10 — VIBE
+    {
+        "q": "Q10. Vibe",
+        "type": "multi",
+        "options": {
+            "Quiet": ["quiet", "peace", "calm", "silent", "relax", "soft"],
+            "Lively": ["lively", "fun", "energy", "busy", "social", "vibrant"],
+            "Romantic": ["romantic", "love", "couple", "intimate", "warm", "soft"],
+            "Photo": ["photo", "aesthetic", "instagram", "view", "scenic", "visual"]
+        }
+    }
+]
+
+# ─────────────────────────────
+# GLOBAL INPUTS
+# ─────────────────────────────
+
+st.divider()
+
+user_text = st.text_area("✍️ Describe your ideal trip (optional)")
+
+uploaded_image = st.file_uploader("🖼 Upload image (optional)", type=["png", "jpg", "jpeg"])
+
+image_description = ""
+image_b64 = ""
+
+if uploaded_image:
+    img = Image.open(uploaded_image)
+    st.image(img, caption="Uploaded Image")
+
+    # encode image for backend
+    image_b64 = base64.b64encode(uploaded_image.read()).decode("utf-8")
+    image_description = "user_uploaded_image"
+
+# ─────────────────────────────
+# QUESTIONS ENGINE
+# ─────────────────────────────
+
+tags = []
+answers = {}
+
+for i, item in enumerate(QUESTIONS):
+    st.subheader(item["q"])
+
+    if item["type"] == "radio":
+        ans = st.radio("", list(item["options"].keys()), key=f"q{i}")
+        tags += item["options"].get(ans, [])
+        answers[item["q"]] = ans
+
+    elif item["type"] == "multi":
+        ans = st.multiselect("", list(item["options"].keys()), key=f"q{i}")
+        for a in ans:
+            tags += item["options"].get(a, [])
+        answers[item["q"]] = ans
+
+    st.divider()
+
+# remove duplicates
+tags = list(set(tags))
+
+# ─────────────────────────────
+# SUBMIT
+# ─────────────────────────────
+
+if st.button("🚀 Tìm kiếm lộ trình", use_container_width=True):
+
+    payload = {
+        "text": user_text,
+        "image_description": image_description,
+        "image": image_b64,
+        "tags": tags,
+        "answers": answers
+    }
+
+    st.write("📦 DEBUG payload:", payload)
+
+    try:
+        res = requests.post(
+            "http://localhost:5000/recommend",
+            json=payload,
+            timeout=15
+        )
+
+        st.write("📡 Status:", res.status_code)
+
+        if res.status_code == 200:
+            data = res.json()
+
+            st.success("✅ Success")
+
+            with st.expander("RAW RESPONSE"):
+                st.json(data)
+
+            st.subheader("📍 Locations")
+            for loc in data.get("locations", []):
+                meta = loc.get("metadata", {})
+                st.markdown(f"### {meta.get('name', loc.get('location_id'))}")
+                st.write(loc.get("score", 0))
+                st.write(meta.get("description", ""))
+
+            st.subheader("🎯 Activities")
+            for act in data.get("activities", []):
+                st.write(f"- {act.get('activity_id')} ({act.get('score', 0):.3f})")
+
+        else:
+            st.error(res.text)
+
+    except Exception as e:
+        st.error(f"Connection failed: {e}")
