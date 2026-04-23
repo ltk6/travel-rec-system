@@ -156,23 +156,53 @@ user_text = st.text_area("✍️ Describe your ideal trip (optional)")
 
 uploaded_image = st.file_uploader("🖼 Upload image (optional)", type=["png", "jpg", "jpeg"])
 
-image_description = ""
 image_b64 = ""
 
 if uploaded_image:
     img = Image.open(uploaded_image)
     st.image(img, caption="Uploaded Image")
+    # getvalue() trả về toàn bộ bytes bất kể vị trí file pointer sau Image.open()
+    image_b64 = base64.b64encode(uploaded_image.getvalue()).decode("utf-8")
 
-    # encode image for backend
-    image_b64 = base64.b64encode(uploaded_image.read()).decode("utf-8")
-    image_description = "user_uploaded_image"
+# ─────────────────────────────
+# CONSTRAINTS
+# ─────────────────────────────
+
+st.divider()
+st.subheader("⚙️ Constraints")
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    budget = st.number_input(
+        "Ngân sách (VNĐ)",
+        min_value=0,
+        step=500_000,
+        value=5_000_000,
+        help="Tổng ngân sách cho chuyến đi"
+    )
+with col2:
+    duration = st.number_input(
+        "Thời gian (giờ)",
+        min_value=1,
+        max_value=336,
+        value=48,
+        help="Tổng thời gian chuyến đi tính bằng giờ"
+    )
+with col3:
+    people = st.number_input(
+        "Số người",
+        min_value=1,
+        max_value=50,
+        value=1
+    )
+
+top_k = st.slider("Số địa điểm gợi ý", min_value=1, max_value=20, value=5)
 
 # ─────────────────────────────
 # QUESTIONS ENGINE
 # ─────────────────────────────
 
 tags = []
-answers = {}
 
 for i, item in enumerate(QUESTIONS):
     st.subheader(item["q"])
@@ -180,13 +210,11 @@ for i, item in enumerate(QUESTIONS):
     if item["type"] == "radio":
         ans = st.radio("", list(item["options"].keys()), key=f"q{i}")
         tags += item["options"].get(ans, [])
-        answers[item["q"]] = ans
 
     elif item["type"] == "multi":
         ans = st.multiselect("", list(item["options"].keys()), key=f"q{i}")
         for a in ans:
             tags += item["options"].get(a, [])
-        answers[item["q"]] = ans
 
     st.divider()
 
@@ -200,14 +228,21 @@ tags = list(set(tags))
 if st.button("🚀 Tìm kiếm lộ trình", use_container_width=True):
 
     payload = {
-        "text": user_text,
-        "image_description": image_description,
-        "image": image_b64,
-        "tags": tags,
-        "answers": answers
+        "text":             user_text,
+        "image":            image_b64,
+        "tags":             tags,
+        "constraints": {
+            "budget":   budget   if budget   > 0 else None,
+            "duration": duration if duration > 0 else None,
+            "people":   people   if people   > 0 else None,
+        },
+        "top_k_locations":  top_k,
     }
 
-    st.write("📦 DEBUG payload:", payload)
+    st.write("📦 DEBUG payload (no vectors):", {
+        **payload,
+        "image": f"<base64 {len(image_b64)} chars>" if image_b64 else ""
+    })
 
     try:
         res = requests.post(
