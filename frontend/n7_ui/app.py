@@ -6,7 +6,7 @@ import base64
 st.set_page_config(page_title="Travel Questionnaire", page_icon="🧭", layout="centered")
 
 st.title("🧭 Travel Questionnaire")
-st.markdown("20 questions + text + image → structured output for N1")
+st.markdown("10 questions + text + image → structured output for N1")
 
 # ─────────────────────────────
 # QUESTIONS

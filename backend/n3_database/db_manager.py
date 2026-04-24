@@ -3,16 +3,9 @@ import json
 import logging
 from typing import List, Dict, Any
 
-from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
-load_dotenv()
-
-PG_URI = os.getenv(
-    "PG_URI",
-    "postgresql://localhost:5432/smart_tourism_db"
-)
+from config.settings import PG_URI
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
