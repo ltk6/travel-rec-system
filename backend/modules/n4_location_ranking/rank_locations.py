@@ -6,12 +6,13 @@ N4 — Location Ranking Module
 Ranks locations by computing weighted cosine similarity between
 user vectors (from N1) and location vectors (from DB/N3).
 
-Weights are computed dynamically from user_input richness:
-  - text length  → emotion + context signals
-  - tag count    → tag signal
-  - image present → image signal
+Weights are computed dynamically from preprocessed user channels:
+    - emotion keyword string length
+    - context keyword string length
+    - tag keyword string length
+    - image keyword string length
 
-Falls back to fixed WEIGHTS when user_input is absent:
+Falls back to fixed WEIGHTS when preprocessed_user_input is absent:
     emotion  (user) vs text (location) : 0.3
     context  (user) vs text (location) : 0.2
     tag      (user) vs tag  (location) : 0.4
@@ -26,23 +27,13 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── Fallback weights (when user_input is absent) ──────────────
+# ── Fallback weights (when preprocessed_user_input is absent) ──
 WEIGHTS = {
     "emotion": 0.3,
     "context": 0.2,
     "tag":     0.4,
     "image":   0.1,
 }
-
-# ── Base informativeness per input type ───────────────────────
-# Reflects how expressive each source is per unit of input.
-# Text (natural language) > Image (specific when present) > Tag (predefined).
-SIGNAL_BASE = {
-    "text":  1.0,
-    "tag":   0.5,
-    "image": 0.9,
-}
-
 
 # ── Vector helpers ────────────────────────────────────────────
 
@@ -67,86 +58,65 @@ def _cosine(a: list[float] | None, b: list[float] | None) -> float:
     return _dot(a, b) / (na * nb)
 
 
-# ── Dynamic weight helpers ────────────────────────────────────
-
-def _presence_text(word_count: int) -> float:
-    """
-    Presence factor for text input.
-    Floor of 0.5 ensures even very short text has meaningful weight —
-    natural language is more expressive than predefined tags regardless of length.
-    Saturates at 30 words.
-    """
-    if word_count == 0:
-        return 0.0
-    return max(0.5, min(1.0, word_count / 30.0))
-
-
-def _presence_tag(tag_count: int) -> float:
-    """Linear presence factor for tags. 10 tags = full confidence."""
-    return min(1.0, tag_count / 10.0)
-
-
 def _compute_weights(
-    user_input: dict[str, Any],
+    preprocessed_user_input: dict[str, Any],
     user_vectors: dict[str, Any],
 ) -> dict[str, float]:
     """
-    Compute dynamic scoring weights based on user input richness.
+    Compute dynamic scoring weights based on preprocessed user channels.
 
     Three principles:
-    1. Absent input -> weight zeroed out (no guessing from empty vectors).
-    2. Text has a base advantage: presence floor 0.5 even when very short.
+    1. Channel richness is measured by keyword count of each preprocessed string.
+    2. Missing/empty vector channel -> its weight is forced to zero.
     3. All four weights normalize to sum = 1.0.
 
     Falls back to WEIGHTS if every signal is zero.
     """
-    text       = (user_input.get("text") or "").strip()
-    tags       = user_input.get("tags") or []
-    image_desc = (user_input.get("image_description") or "").strip()
+    emotion_text = str(preprocessed_user_input.get("emotion") or "").strip()
+    context_text = str(preprocessed_user_input.get("context") or "").strip()
+    tag_text = str(preprocessed_user_input.get("tag") or "").strip()
+    image_text = str(preprocessed_user_input.get("image") or "").strip()
 
-    word_count = len(text.split()) if text else 0
-    tag_count  = len(tags) if isinstance(tags, list) else 0
+    emotion_count = len(emotion_text.split()) if emotion_text else 0
+    context_count = len(context_text.split()) if context_text else 0
+    tag_count = len(tag_text.split()) if tag_text else 0
+    image_count = len(image_text.split()) if image_text else 0
 
-    p_text  = _presence_text(word_count)
-    p_tag   = _presence_tag(tag_count)
-    p_image = 1.0 if image_desc else 0.0
+    raw_emotion = float(emotion_count)
+    raw_context = float(context_count)
+    raw_tag = float(tag_count)
+    raw_image = float(image_count)
 
     # Zero out if the corresponding vector is missing or empty (N1 could not embed it).
     # `not v` is True for both None and [] — intentional: both mean "no usable vector".
-    if not user_vectors.get("emotion") and not user_vectors.get("context"):
-        p_text = 0.0
+    if not user_vectors.get("emotion"):
+        raw_emotion = 0.0
+    if not user_vectors.get("context"):
+        raw_context = 0.0
     if not user_vectors.get("tag"):
-        p_tag = 0.0
+        raw_tag = 0.0
     if not user_vectors.get("image"):
-        p_image = 0.0
+        raw_image = 0.0
 
-    raw_text  = SIGNAL_BASE["text"]  * p_text
-    raw_tag   = SIGNAL_BASE["tag"]   * p_tag
-    raw_image = SIGNAL_BASE["image"] * p_image
-
-    total = raw_text + raw_tag + raw_image
+    total = raw_emotion + raw_context + raw_tag + raw_image
 
     if total < 1e-9:
         logger.warning("[N4] Tất cả tín hiệu đầu vào đều rỗng — dùng trọng số cố định")
         return WEIGHTS.copy()
 
-    w_text  = raw_text  / total
-    w_tag   = raw_tag   / total
-    w_image = raw_image / total
-
     weights = {
-        "emotion": round(w_text * 0.6, 4),
-        "context": round(w_text * 0.4, 4),
-        "tag":     round(w_tag,        4),
-        "image":   round(w_image,      4),
+        "emotion": round(raw_emotion / total, 4),
+        "context": round(raw_context / total, 4),
+        "tag": round(raw_tag / total, 4),
+        "image": round(raw_image / total, 4),
     }
 
     logger.info(
         "[N4] Dynamic weights | "
         "emotion=%.3f  context=%.3f  tag=%.3f  image=%.3f | "
-        "text_words=%d  tags=%d  has_image=%s",
+        "emotion_kw=%d  context_kw=%d  tag_kw=%d  image_kw=%d",
         weights["emotion"], weights["context"], weights["tag"], weights["image"],
-        word_count, tag_count, bool(image_desc),
+        emotion_count, context_count, tag_count, image_count,
     )
     return weights
 
@@ -267,10 +237,11 @@ def rank_locations(data: dict) -> dict:
 
     Input:
     {
-        "user_input": {                      # optional — enables dynamic weights
-            "text":              str | None,
-            "image_description": str | None,
-            "tags":              list[str] | None
+        "preprocessed_user_input": {         # optional — enables dynamic weights
+            "emotion": str | None,
+            "context": str | None,
+            "tag":     str | None,
+            "image":   str | None
         },
         "user_vectors": {
             "emotion": list[float] | None,
@@ -311,7 +282,11 @@ def rank_locations(data: dict) -> dict:
         ]
     }
     """
-    user_input   = data.get("user_input", {})
+    preprocessed_user_input = (
+        data.get("preprocessed_user_input")
+        or data.get("user_processed_input")
+        or {}
+    )
     user_vectors = data.get("user_vectors", {})
     locations    = data.get("locations", [])
     constraints  = data.get("constraints") or {}
@@ -321,11 +296,11 @@ def rank_locations(data: dict) -> dict:
         logger.warning("[N4] Không có địa điểm nào để xếp hạng")
         return {"locations": []}
 
-    if user_input:
-        weights = _compute_weights(user_input, user_vectors)
+    if preprocessed_user_input:
+        weights = _compute_weights(preprocessed_user_input, user_vectors)
     else:
         weights = WEIGHTS
-        logger.info("[N4] user_input vắng mặt — dùng trọng số cố định")
+        logger.info("[N4] preprocessed_user_input vắng mặt — dùng trọng số cố định")
 
     scored: list[dict] = []
     for loc in locations:
