@@ -2,6 +2,7 @@
 seed_with_vectors.py
 Auto-generated — DO NOT EDIT
 """
+
 from backend.n3_database.db_manager import init_db, save_location
 
 LOCATIONS = [
