@@ -1,52 +1,68 @@
-﻿"""
-n1_module
-=========
-N1 – Text Embedding Module
+﻿from __future__ import annotations
 
-Public API
-----------
-    from n1_embedding import embed
+from typing import Dict, Any
 
-    result = embed({
-        "text": "Tôi muốn một chuyến đi yên tĩnh gần thiên nhiên",
-        "image_description": "Peaceful misty highland, wooden structures",
-        "tags": ["thiên nhiên", "yên tĩnh", "couple"]
-    })
-
-    print(result["vector"])   # list[float], 1024-dim
-"""
-
-from __future__ import annotations
-
-from .embedder     import embed_text
-from .preprocessor import build_enriched_text
-from .maps         import stats as map_stats
+from .embedder import embed_texts
+from .preprocessor import build_inputs
+from .maps import stats as map_stats
 
 
-def embed(data: dict) -> dict:
+def embed(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    N1 main function — as specified by the system interface contract.
+    Unified embedding API.
 
-    Parameters
-    ----------
-    data : dict with keys:
-        "text"              (str)       Free-text requirement, vi/en/mixed.
-        "image_description" (str)       Plain English description from N2.
-        "tags"              (list[str]) Quiz/user tags, vi/en/mixed.
+    ── INPUT ────────────────────────────────────────────
+    {
+        "text":              str | None,
+        "tags":              list[str] | None,
+        "image_description": str | None,
+    }
 
-    Returns
-    -------
-    dict:
-        "vector" : list[float]  Normalized 1024-dim embedding vector.
+    ── OUTPUT ───────────────────────────────────────────
+    {
+        "preprocessed": {
+            "text":               str,
+            "aug_text":           str,
+            "aug_tags":           str,
+            "image_description":  str
+        },
+        "vectors": {
+            "text":               [...] | None,
+            "aug_text":           [...] | None,
+            "aug_tags":           [...] | None,
+            "image_description":  [...] | None,
+        }
+    }
     """
-    text              = data.get("text", "")
-    image_description = data.get("image_description", "")
-    tags              = data.get("tags", [])
+    if not isinstance(data, dict):
+        raise ValueError("embed() accepts a single dict only")
 
-    enriched = build_enriched_text(text, image_description, tags)
-    vector   = embed_text(enriched)
+    preprocessed = build_inputs(
+        text                = data.get("text", ""),
+        tags                = data.get("tags", []),
+        image_description   = data.get("image_description", ""),
+    )
 
-    return {"vector": vector}
+    vectors = embed_texts([
+            preprocessed["text"],
+            preprocessed["aug_text"],
+            preprocessed["aug_tags"],
+            preprocessed["image_description"],
+        ])
 
+    return {
+        "preprocessed": {
+            "text":               preprocessed["text"],
+            "aug_text":           preprocessed["aug_text"],
+            "aug_tags":           preprocessed["aug_tags"],
+            "image_description":  preprocessed["image_description"],
+        },
+        "vectors": {
+            "text":               vectors[0],
+            "aug_text":           vectors[1],
+            "aug_tags":           vectors[2],
+            "image_description":  vectors[3],
+        },
+    }
 
 __all__ = ["embed", "map_stats"]

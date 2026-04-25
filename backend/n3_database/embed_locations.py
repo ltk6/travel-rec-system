@@ -17,7 +17,7 @@ _root = os.path.dirname(_here)
 if _root not in sys.path:
     sys.path.insert(0, _root)
 
-from seed_data import LOCATIONS
+from backend.n3_database.seed_data import LOCATIONS
 
 # ─────────────────────────────────────────────────────────────
 # LOAD N1 (REAL OR FALLBACK)

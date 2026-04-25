@@ -1,0 +1,8 @@
+﻿import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+PG_URI = os.getenv("PG_URI")

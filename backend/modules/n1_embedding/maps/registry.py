@@ -1,30 +1,40 @@
-﻿"""
+"""
 maps/registry.py
 ================
-Unified registry for all keyword maps.
-Exposes a single lookup API used by the preprocessor.
 
-Three active maps:
-  - tags     : vi/en tag → enriched English travel keywords
-  - emotions : emotional state → travel style keywords
-  - context  : season/weather + social group → travel keywords
+Core keyword registry and semantic extraction engine for N1 preprocessing.
+
+Provides high-performance lookup and matching for:
+  - Emotion signals  (user mood → travel intent keywords)
+  - Context signals  (situational constraints → grounding keywords)
+  - Tag signals      (explicit user preferences → travel descriptors)
+
+Responsible only for extraction and expansion — does not build embeddings
+or final vectors.
+
+────────────────────────────────────────────────────────────
+SECTION INDEX
+────────────────────────────────────────────────────────────
+  A. MAP REGISTRATION   — load and normalize emotion/context/tag maps
+  B. MATCH RESULT TYPE  — structured match output (source, key, expansion)
+  C. TEXT SCANNING      — emotion + context extraction with deduplication
+  D. TAG EXPANSION      — tag normalization and enrichment
+  E. UTILITIES          — stats
 """
 
 from __future__ import annotations
+
 from typing import NamedTuple
 
 from .emotions import ALL_EMOTIONS
-from .tags     import ALL_TAGS
-from .context  import ALL_CONTEXT
+from .tags import ALL_TAGS
+from .context import ALL_CONTEXT
 
 
-# ── Build lowercased lookup tables once at import
+# ── Lowercased lookup tables built once at import ─────────────────────────────
 _EMOTIONS: dict[str, str] = {k.lower().strip(): v for k, v in ALL_EMOTIONS.items()}
 _TAGS:     dict[str, str] = {k.lower().strip(): v for k, v in ALL_TAGS.items()}
 _CONTEXT:  dict[str, str] = {k.lower().strip(): v for k, v in ALL_CONTEXT.items()}
-
-# Full-text scan map (emotions + context only — tags operate on a list)
-_FULLTEXT: dict[str, str] = {**_EMOTIONS, **_CONTEXT}
 
 
 class MatchResult(NamedTuple):
@@ -33,52 +43,84 @@ class MatchResult(NamedTuple):
     expansion: str   # travel keywords produced
 
 
-# ─────────────────────────────────────────────────────────────
-# PUBLIC API
-# ─────────────────────────────────────────────────────────────
+def _dedupe_substrings(matches: list[MatchResult]) -> list[MatchResult]:
+    """Keep only the longest match when one key is a substring of another."""
+    kept: list[MatchResult] = []
+    for m in sorted(matches, key=lambda m: len(m.key), reverse=True):
+        if not any(m.key in k.key for k in kept):
+            kept.append(m)
+    return kept
 
-def scan_text(text: str) -> list[MatchResult]:
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+def scan_text(text: str) -> dict[str, list[MatchResult]]:
     """
-    Scan free text (user_text or image_description) against
-    emotion and context maps. Returns all matches found.
+    Scan free text and return matched signals grouped by channel.
+
+    Returns:
+        {
+            "emotion": [...],
+            "context": [...],
+        }
+
+    Uses substring matching with longest-match deduplication.
     """
-    normed  = text.lower().strip()
-    results: list[MatchResult] = []
+    normed = text.lower().strip()
 
-    for key, expansion in _EMOTIONS.items():
-        if key in normed:
-            results.append(MatchResult("emotion", key, expansion))
+    emotion_hits = [
+        MatchResult("emotion", key, _EMOTIONS[key])
+        for key in _EMOTIONS if key in normed
+    ]
+    context_hits = [
+        MatchResult("context", key, _CONTEXT[key])
+        for key in _CONTEXT if key in normed
+    ]
 
-    for key, expansion in _CONTEXT.items():
-        if key in normed:
-            results.append(MatchResult("context", key, expansion))
+    return {
+        "emotion": _dedupe_substrings(emotion_hits),
+        "context": _dedupe_substrings(context_hits),
+    }
 
-    return results
 
-
-def expand_tags(tags: list[str]) -> list[MatchResult]:
+def expand_tags(tags: list[str]) -> dict[str, list[MatchResult]]:
     """
-    Translate/expand a list of tags.
-    Known tags → enriched English keywords.
-    Unknown tags → passed through unchanged.
+    Expand a list of tags into keyword strings.
+
+    Known tags are expanded via the tag map.
+    Unknown tags are passed through as-is.
+
+    Returns:
+        {
+            "tag":              [...],   # matched and expanded
+            "tag_passthrough":  [...],   # unrecognised, passed through raw
+        }
     """
-    results: list[MatchResult] = []
+    expanded:    list[MatchResult] = []
+    passthrough: list[MatchResult] = []
+
     for tag in tags:
         key = tag.lower().strip()
         if key in _TAGS:
-            results.append(MatchResult("tag", tag, _TAGS[key]))
+            expanded.append(MatchResult("tag", tag, _TAGS[key]))
         else:
-            results.append(MatchResult("tag_passthrough", tag, tag))
-    return results
+            passthrough.append(MatchResult("tag_passthrough", tag, tag))
+
+    return {
+        "tag":             expanded,
+        "tag_passthrough": passthrough,
+    }
 
 
 def stats() -> str:
+    """Return a formatted summary of registry coverage."""
     lines = [
-        "── Map Registry ────────────────────────",
-        f"  Emotions  : {len(_EMOTIONS):>3} entries",
-        f"  Tags      : {len(_TAGS):>3} entries",
-        f"  Context   : {len(_CONTEXT):>3} entries",
-        f"  Total     : {len(_EMOTIONS) + len(_TAGS) + len(_CONTEXT):>3} entries",
-        "────────────────────────────────────────",
+        "── Map Registry ─────────────────────────────────────────",
+        f"  Emotions : {len(_EMOTIONS):>3}",
+        f"  Tags     : {len(_TAGS):>3}",
+        f"  Context  : {len(_CONTEXT):>3}",
+        "  ─────────────────────────────────────────────────────",
+        f"  Total    : {len(_EMOTIONS) + len(_TAGS) + len(_CONTEXT):>3}",
+        "─────────────────────────────────────────────────────────",
     ]
     return "\n".join(lines)
