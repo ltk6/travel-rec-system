@@ -111,7 +111,7 @@ DESIGN NOTES:
 ─────────────────────────────────────────────
 """
 
-def generate_activities(data: dict) -> dict:
-    pass
-
+from .n5_activity_generator import generate_activities
+ 
 __all__ = ["generate_activities"]
+ 
