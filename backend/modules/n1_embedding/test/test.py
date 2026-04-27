@@ -3,15 +3,19 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 from pathlib import Path
-
 import sys
-import os
 
 # ─────────────────────────────────────────────
-# FIX IMPORT PATH (ONLY FOR MODULE IMPORTS)
+# SAFE IMPORT PATH (dynamic project root)
 # ─────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.append(str(PROJECT_ROOT))
+CURRENT = Path(__file__).resolve()
+
+for parent in CURRENT.parents:
+    if (parent / "n1_embedding").exists():
+        sys.path.insert(0, str(parent))
+        break
+else:
+    raise RuntimeError("Could not locate project root containing 'n1_embedding'")
 
 from n1_embedding import embed
 
@@ -25,7 +29,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 # ─────────────────────────────────────────────
-# SAVE JSON (None-safe + stable path)
+# SAVE JSON (stable + safe)
 # ─────────────────────────────────────────────
 def save_json(result: dict, filename: str):
     def sanitize(obj: Any):
@@ -36,7 +40,6 @@ def save_json(result: dict, filename: str):
         return obj
 
     payload = sanitize(result)
-
     output_path = OUTPUT_DIR / filename
 
     with open(output_path, "w", encoding="utf-8") as f:
