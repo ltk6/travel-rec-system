@@ -9,42 +9,19 @@ Outputs:
 """
 
 from __future__ import annotations
-import sys, os, json, time
+import sys, json, time
+from pathlib import Path
 
-# ── Ensure project root is on path
-_here = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_here)
-if _root not in sys.path:
-    sys.path.insert(0, _root)
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parent.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.n3_database.seed_data import LOCATIONS
+from backend.modules.n1_embedding import embed
 
-# ─────────────────────────────────────────────────────────────
-# LOAD N1 (REAL OR FALLBACK)
-# ─────────────────────────────────────────────────────────────
-
-try:
-    from n1_embedding import embed as n1_embed
-    print("[N1] Using real BGE-M3 embeddings")
-    _N1_REAL = True
-
-except ImportError as e:
-    print(f"[N1] Import failed ({e}) — using SHA-256 mock")
-
-    import hashlib, math
-
-    def _sha_embed(text: str) -> list[float]:
-        digest = hashlib.sha256(text.encode()).digest()
-        raw    = [b / 255.0 for b in digest]
-        tiled  = (raw * (1024 // len(raw) + 1))[:1024]
-        norm   = math.sqrt(sum(x * x for x in tiled)) or 1.0
-        return [x / norm for x in tiled]
-
-    def n1_embed(data: dict) -> dict:
-        text = f"{data.get('text', '')} {' '.join(data.get('tags', []))}"
-        return {"vector": _sha_embed(text)}
-
-    _N1_REAL = False
+print("[N1] Using REAL BGE-M3 embeddings")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -54,15 +31,12 @@ except ImportError as e:
 def embed_location(loc: dict) -> list[float]:
     meta = loc["metadata"]
 
-    enriched_text = meta["description"] + " " + " ".join(meta["tags"])
-
-    result = n1_embed({
-        "text": enriched_text,
-        "image_description": "",
+    result = embed({
+        "text": meta["description"],
         "tags": meta["tags"],
     })
 
-    return result["vector"]
+    return result["vectors"]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -89,11 +63,22 @@ def _write_python(locations: list[dict], path: str) -> None:
     for loc in locations:
         meta = loc["metadata"]
         geo  = loc["geo"]
+        vecs = loc["vectors"]
+
+    for loc in locations:
+        meta = loc["metadata"]
+        geo  = loc["geo"]
+        vecs = loc["vectors"]
 
         lines += [
             '    {',
             f'        "location_id": {repr(loc["location_id"])},',
-            f'        "vector": {repr(loc["vector"])},',
+            '        "vectors": {',
+            f'            "text": {repr(vecs["text"])},',
+            f'            "aug_text": {repr(vecs["aug_text"])},',
+            f'            "aug_tags": {repr(vecs["aug_tags"])},',
+            f'            "image_description": {repr(vecs["image_description"])},',
+            '        },',
             f'        "metadata": {{',
             f'            "name": {repr(meta["name"])},',
             f'            "description": {repr(meta["description"])},',
@@ -119,6 +104,7 @@ def _write_python(locations: list[dict], path: str) -> None:
         '    seed_database()',
     ]
 
+
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -130,7 +116,7 @@ def _write_python(locations: list[dict], path: str) -> None:
 def run() -> list[dict]:
     print("\n" + "="*60)
     print(f"Embedding {len(LOCATIONS)} locations")
-    print(f"Mode: {'BGE-M3 (REAL)' if _N1_REAL else 'SHA-256 (MOCK)'}")
+    print("Mode: N1 REAL (returns 4-vector dict)")
     print("="*60 + "\n")
 
     embedded = []
@@ -146,13 +132,13 @@ def run() -> list[dict]:
 
         embedded.append({
             "location_id": loc["location_id"],
-            "vector": vec,
+            "vectors": vec,
             "metadata": loc["metadata"],
             "geo": loc["geo"],
         })
 
-    json_path = os.path.join(_here, "locations_with_vectors.json")
-    py_path   = os.path.join(_here, "seed_with_vectors.py")
+    json_path = Path(__file__).resolve().parent / "locations_with_vectors.json"
+    py_path   = Path(__file__).resolve().parent / "seed_with_vectors.py"
 
     _write_json(embedded, json_path)
     _write_python(embedded, py_path)
@@ -160,8 +146,8 @@ def run() -> list[dict]:
     print("\nSaved:")
     print(f" - {json_path}")
     print(f" - {py_path}")
-    print(f"\nVector dim: {len(embedded[0]['vector'])}")
-    print("="*60 + "\n")
+    print(f"\nVector sample dims: {len(embedded[0]['vectors']['text'])}")
+    print("=" * 60 + "\n")
 
     return embedded
 
