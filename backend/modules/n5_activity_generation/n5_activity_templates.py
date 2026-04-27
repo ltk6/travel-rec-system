@@ -26,6 +26,20 @@
 #   - "cost" → giữ nguyên
 #   - "tags" → giữ nguyên nhưng mở rộng 5-7 tags
 # =============================================================================
+# Template bank cho N5 Activity Generator.
+#
+# THIẾT KẾ:
+#   - LOCATION_PROFILES: đặc trưng từng địa điểm (tags, mô tả, mùa)
+#   - ACTIVITY_TYPE_BANK: ~100+ template theo activity_type × subtype
+#   - Mỗi template là "recipe" — N5 sẽ instantiate + biến thể để đạt 100/location
+#
+# SCALABILITY:
+#   - Thêm location mới: chỉ cần thêm vào LOCATION_PROFILES
+#   - Thêm loại hoạt động mới: thêm vào ACTIVITY_TYPE_BANK
+#   - Generator engine trong n5_activity_generator.py tự scale ra 100/location
+# =============================================================================
+
+from typing import Dict, List, Any
 
 import json
 import os
