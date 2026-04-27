@@ -3,108 +3,66 @@
 from typing import Dict, Any
 
 from .embedder import embed_texts
-from .preprocessor import build_user_input, build_location_input
+from .preprocessor import build_inputs
 from .maps import stats as map_stats
 
 
 def embed(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Unified embedding API
+    Unified embedding API.
 
-    USER:
-        {
-            "text": str,
-            "image_description": str,
-            "tags": list[str]
-        }
+    ── INPUT ────────────────────────────────────────────
+    {
+        "text":              str | None,
+        "tags":              list[str] | None,
+        "image_description": str | None,
+    }
 
-    LOCATION:
-        {
-            "description": str,
-            "tags": list[str]
+    ── OUTPUT ───────────────────────────────────────────
+    {
+        "preprocessed": {
+            "text":               str,
+            "aug_text":           str,
+            "aug_tags":           str,
+            "image_description":  str
+        },
+        "vectors": {
+            "text":               [...] | None,
+            "aug_text":           [...] | None,
+            "aug_tags":           [...] | None,
+            "image_description":  [...] | None,
         }
-
-    OUTPUT:
-        USER:
-        {
-            "type": "user",
-            "vectors": {
-                "emotion": [...],
-                "context": [...],
-                "tag": [...],
-                "image": [...]
-            }
-        }
-
-        LOCATION:
-        {
-            "type": "location",
-            "vectors": {
-                "text": [...],
-                "tag": [...]
-            }
-        }
+    }
     """
-
     if not isinstance(data, dict):
         raise ValueError("embed() accepts a single dict only")
 
-    # ─────────────────────────────────────────────
-    # 1. detect type
-    # ─────────────────────────────────────────────
-    is_location = "description" in data
-
-    # ─────────────────────────────────────────────
-    # 2. USER PIPELINE
-    # ─────────────────────────────────────────────
-    if not is_location:
-        processed = build_user_input(
-            text=data.get("text", ""),
-            image_description=data.get("image_description", ""),
-            tags=data.get("tags", []),
-        )
-
-        # EXACT keys from preprocessor
-        texts = [
-            processed["expanded_emotion"],
-            processed["expanded_context"],
-            processed["expanded_tag"],
-            processed["expanded_image"],
-        ]
-        vectors = embed_texts(texts)
-
-        return {
-            "type": "user",
-            "vectors": {
-                "emotion": vectors[0],
-                "context": vectors[1],
-                "tag": vectors[2],
-                "image": vectors[3],
-            }
-        }
-
-    # ─────────────────────────────────────────────
-    # 3. LOCATION PIPELINE
-    # ─────────────────────────────────────────────
-    processed = build_location_input(
-        description=data.get("description", ""),
-        tags=data.get("tags", []),
+    preprocessed = build_inputs(
+        text                = data.get("text", ""),
+        tags                = data.get("tags", []),
+        image_description   = data.get("image_description", ""),
     )
 
-    texts = [
-        processed["expanded_text"],
-        processed["expanded_tag"],
-    ]
-
-    vectors = embed_texts(texts)
+    vectors = embed_texts([
+            preprocessed["text"],
+            preprocessed["aug_text"],
+            preprocessed["aug_tags"],
+            preprocessed["image_description"],
+        ])
 
     return {
-        "type": "location",
+        "preprocessed": {
+            "text":               preprocessed["text"],
+            "aug_text":           preprocessed["aug_text"],
+            "aug_tags":           preprocessed["aug_tags"],
+            "image_description":  preprocessed["image_description"],
+        },
         "vectors": {
-            "text": vectors[0],
-            "tag": vectors[1],
-        }
+            "text":               vectors[0],
+            "aug_text":           vectors[1],
+            "aug_tags":           vectors[2],
+            "image_description":  vectors[3],
+        },
     }
-
 
 __all__ = ["embed", "map_stats"]

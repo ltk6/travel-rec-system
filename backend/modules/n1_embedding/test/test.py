@@ -2,35 +2,30 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict
+from pathlib import Path
 
-from . import embed
+import sys
+import os
+
+# ─────────────────────────────────────────────
+# FIX IMPORT PATH (ONLY FOR MODULE IMPORTS)
+# ─────────────────────────────────────────────
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(PROJECT_ROOT))
+
+from n1_embedding import embed
 
 
 # ─────────────────────────────────────────────
-# Pretty print (NONE SAFE)
+# OUTPUT DIRECTORY SETUP
 # ─────────────────────────────────────────────
-def pretty_print(result: dict):
-    print("\n════════ EMBED RESULT ════════")
-
-    print("Type:", result["type"])
-
-    vectors = result["vectors"]
-
-    for name, vec in vectors.items():
-
-        # IMPORTANT: handle missing channel
-        if vec is None:
-            print(f"\n[{name}] None (no signal)")
-            continue
-
-        print(f"\n[{name}] dim={len(vec)}")
-        print("head:", vec[:5])
-
-    print("\n══════════════════════════════\n")
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR
+OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 # ─────────────────────────────────────────────
-# Save JSON (None-safe)
+# SAVE JSON (None-safe + stable path)
 # ─────────────────────────────────────────────
 def save_json(result: dict, filename: str):
     def sanitize(obj: Any):
@@ -38,14 +33,16 @@ def save_json(result: dict, filename: str):
             return {k: sanitize(v) for k, v in obj.items()}
         if isinstance(obj, list):
             return [sanitize(v) for v in obj]
-        if obj is None:
-            return None
         return obj
 
     payload = sanitize(result)
 
-    with open(filename, "w", encoding="utf-8") as f:
+    output_path = OUTPUT_DIR / filename
+
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    print(f"[saved] {output_path}")
 
 
 # ─────────────────────────────────────────────
@@ -54,13 +51,11 @@ def save_json(result: dict, filename: str):
 def test_user():
     data: Dict[str, Any] = {
         "text": "Tôi muốn một chuyến đi yên tĩnh gần thiên nhiên",
-        "image_description": "",
+        "image_description": None,
         "tags": ["thiên nhiên", "yên tĩnh", "couple"],
     }
 
     result = embed(data)
-
-    pretty_print(result)
     save_json(result, "user_embedding.json")
 
 
@@ -69,13 +64,11 @@ def test_user():
 # ─────────────────────────────────────────────
 def test_location():
     data: Dict[str, Any] = {
-        "description": "Busy coastal city with nightlife and beaches",
+        "text": "Busy coastal city with nightlife and beaches",
         "tags": ["beach", "city", "nightlife"],
     }
 
     result = embed(data)
-
-    pretty_print(result)
     save_json(result, "location_embedding.json")
 
 

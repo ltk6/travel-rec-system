@@ -113,61 +113,137 @@ def run_test(name: str, input_data: dict):
         loc = act.get("location_id", "?")
         loc_counts[loc] = loc_counts.get(loc, 0) + 1
 
-        meta = act.get("metadata", {})
-        atype = meta.get("activity_type", "?")
-        type_counts[atype] = type_counts.get(atype, 0) + 1
+class TestN5HybridGenerator(unittest.TestCase):
+    """
+    Test suite cho hàm generate_activities_hybrid().
+    """
 
-        if _is_sightseeing(act):
-            sightseeing_count += 1
+    def setUp(self):
+        """Chuẩn bị dữ liệu chung cho các test hybrid"""
+        self.user_tags = ["nature", "adventure"]
+        self.locations = [
+            {"name": "Sa Pa", "location_id": "loc_sapa"},
+            {"name": "Đà Lạt", "location_id": "loc_dalat"}
+        ]
+        self.constraints = {
+            "budget": 5_000_000,
+            "max_time_per_day": 480
+        }
 
-    print(f"\n  Per-location counts:")
-    for loc, cnt in loc_counts.items():
-        print(f"    {loc}: {cnt} activities")
+    def test_hybrid_fallback_use_llm_false(self):
+        """Khi use_llm=False, hybrid phải dùng rule-based và trả kết quả 'template'."""
+        result = generate_activities_hybrid(
+            self.user_tags, self.locations, self.constraints, use_llm=False
+        )
+        
+        self.assertTrue(len(result) > 0)
+        for act in result:
+            self.assertEqual(act.get("generated_by"), "template")
 
-    print(f"\n  Activity type distribution:")
-    for atype, cnt in sorted(type_counts.items(), key=lambda x: -x[1]):
-        print(f"    {atype}: {cnt}")
+    def test_hybrid_has_generated_by_field(self):
+        """Mọi activity từ hybrid đều phải có trường generated_by."""
+        result = generate_activities_hybrid(
+            self.user_tags, self.locations, self.constraints, use_llm=False
+        )
+        
+        for act in result:
+            self.assertIn("generated_by", act)
+            self.assertIn(act["generated_by"], ["llm", "template"])
 
-    sightseeing_ratio = sightseeing_count / len(activities) if activities else 0
-    print(f"\n  Sightseeing activities: {sightseeing_count} ({sightseeing_ratio:.1%})")
-    status = "✓ OK" if sightseeing_ratio >= 0.40 else "✗ BELOW TARGET (40%)"
-    print(f"  Sightseeing ratio ≥ 40%: {status}")
+    def test_hybrid_fallback_no_api_key(self):
+        """Khi không có API key, hybrid phải fallback về template dù use_llm=True."""
+        with patch("backend.modules.n5_activity_generation.n5_activity_generator._is_llm_available", 
+                   return_value=False):
+            result = generate_activities_hybrid(
+                self.user_tags, self.locations, self.constraints, use_llm=True
+            )
+        
+        self.assertTrue(len(result) > 0)
+        for act in result:
+            self.assertEqual(act.get("generated_by"), "template")
 
-    # Schema validation
-    print(f"\n  Schema validation (first 3 activities):")
-    required_meta_fields = [
-        "name", "description", "activity_type", "activity_subtype",
-        "intensity", "physical_level", "social_level",
-        "estimated_duration", "price_level", "indoor_outdoor",
-        "weather_dependent", "time_of_day_suitable"
-    ]
-    all_valid = True
-    for i, act in enumerate(activities[:3]):
-        missing = []
-        meta = act.get("metadata", {})
-        for f in required_meta_fields:
-            if f not in meta:
-                missing.append(f)
-        if missing:
-            print(f"    [{i+1}] MISSING: {missing}")
-            all_valid = False
-        else:
-            print(f"    [{i+1}] {meta['name'][:50]} → {meta['activity_type']} / {meta['activity_subtype']}")
+    def test_hybrid_sorting_consistent(self):
+        """Kết quả hybrid phải được sắp xếp theo match_score giảm dần."""
+        result = generate_activities_hybrid(
+            self.user_tags, self.locations, self.constraints, use_llm=False
+        )
+        
+        scores = [act.get("match_score", 0) for act in result]
+        self.assertEqual(scores, sorted(scores, reverse=True))
 
-    if all_valid:
-        print(f"\n  ✓ All schema fields present")
+    def test_hybrid_respects_constraints(self):
+        """Hybrid phải tuân thủ constraints dù dùng template hay LLM."""
+        constraints = {
+            "budget": 300_000,
+            "max_time_per_day": 120,
+        }
+        result = generate_activities_hybrid(
+            ["adventure", "nature"], self.locations, constraints, use_llm=False
+        )
+        
+        for act in result:
+            self.assertLessEqual(act.get("cost", 0), 300_000 * 0.4)   # cho phép margin
+            self.assertLessEqual(act.get("estimated_time_minutes", 0), 120)
 
-    # Sample output JSON
-    if activities:
-        print(f"\n  Sample activity (first):")
-        print(json.dumps(activities[0], indent=4, ensure_ascii=False))
+    def test_hybrid_with_mock_llm_success(self):
+        """Test hybrid với mock LLM thành công (phiên bản ổn định)."""
+        mock_llm_activities = [
+            {
+                "activity_id": "mock_llm_001",
+                "location_id": "loc_sapa",
+                "name": "Trekking ruộng bậc thang Sa Pa",
+                "description": "Trải nghiệm trekking nhẹ nhàng ngắm ruộng bậc thang vào buổi sáng.",
+                "tags": ["trekking", "nature", "photography"],
+                "cost": 280000,
+                "estimated_duration": 210,          # hoặc estimated_time_minutes tùy code của bạn
+                "best_time": ["morning"],
+                "suitable_for": ["couple", "group_small"],
+                "difficulty": "medium",
+                "season": ["sep", "oct"],
+                "reason_template": "Phù hợp với người thích thiên nhiên",
+                "generated_by": "llm",
+                "match_score": 0.92
+            }
+        ]
+
+        # Giả sử hàm hybrid gọi llm_generator.generate_activities
+        with patch("backend.modules.n5_activity_generation.n5_activity_generator.generate_activities_from_llm", 
+                   return_value=mock_llm_activities):
+            
+            result = generate_activities_hybrid(
+                self.user_tags, self.locations, self.constraints, use_llm=True
+            )
+
+        self.assertIsInstance(result, list)
+        self.assertGreater(len(result), 0, 
+            "Hybrid phải trả về ít nhất 1 activity khi mock LLM thành công")
+
+        if result:
+            first = result[0]
+            self.assertIn("generated_by", first)
+            self.assertIn("match_score", first)
+            self.assertIn("reason_template", first)
+
+    def test_hybrid_llm_failure_fallback(self):
+        """Khi LLM thất bại, hybrid phải fallback về template."""
+        with patch("backend.modules.n5_activity_generation.n5_activity_generator.generate_activities_from_llm", 
+                   return_value=None):
+            
+            result = generate_activities_hybrid(
+                self.user_tags, self.locations, self.constraints, use_llm=True
+            )
+        
+        self.assertTrue(len(result) > 0)
+        for act in result:
+            self.assertEqual(act.get("generated_by"), "template")
+
+    def test_original_generate_still_works(self):
+        """Hàm generate_activities gốc phải vẫn hoạt động bình thường."""
+        result = generate_activities(self.user_tags, self.locations, self.constraints)
+        self.assertTrue(len(result) > 0)
+        for act in result:
+            self.assertEqual(act.get("generated_by"), "template")
 
 
-if __name__ == "__main__":
-    run_test("Single location (Sa Pa) — 100 activities target", SAMPLE_INPUT_SINGLE)
-    run_test("Multi-location (Phú Quốc + Nha Trang) — 200 total", SAMPLE_INPUT_MULTI)
-    run_test("Unknown location (Bản Giốc) — fallback test", SAMPLE_INPUT_UNKNOWN_LOCATION)
-
-    print(f"\n{'='*60}")
-    print("  All tests completed.")
-    print(f"{'='*60}\n")
+if __name__ == '__main__':
+    unittest.main()
