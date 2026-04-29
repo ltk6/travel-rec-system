@@ -6,24 +6,22 @@ N4 — LOCATION RANKING MODULE
 Ranks travel locations using weighted cosine similarity between
 user vectors (from N1) and location vectors (from N3).
 
-Weights are computed dynamically based on user_input richness.
-Constraint soft penalties are applied when budget/duration are provided.
+It combines:
+- User vectors from N1 (text/aug_text/aug_tags/img_desc)
+- Location embeddings (text/tag)
+- sig_k-based dynamic channel weighting
 
 ─────────────────────────────────────────────
 INPUT
 ─────────────────────────────────────────────
 {
-    "user_input": {                          # optional — enables dynamic weights
-        "text":              str | None,
-        "image_description": str | None,
-        "tags":              list[str] | None
-    },
+    "sig_k": int,
 
     "user_vectors": {
-        "emotion": list[float] | None,
-        "context": list[float] | None,
-        "image":   list[float] | None,
-        "tag":     list[float] | None
+        "text":     list[float] | None,
+        "aug_text": list[float] | None,
+        "aug_tags": list[float] | None,
+        "img_desc": list[float] | None
     },
 
     "locations": [

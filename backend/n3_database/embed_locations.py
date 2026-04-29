@@ -55,7 +55,7 @@ def _write_python(locations: list[dict], path: str) -> None:
         'Auto-generated — DO NOT EDIT',
         '"""',
         '',
-        'from db_manager import init_db, save_location',
+        'from .db_manager import init_db, save_location',
         '',
         'LOCATIONS = [',
     ]
@@ -77,7 +77,7 @@ def _write_python(locations: list[dict], path: str) -> None:
             f'            "text": {repr(vecs["text"])},',
             f'            "aug_text": {repr(vecs["aug_text"])},',
             f'            "aug_tags": {repr(vecs["aug_tags"])},',
-            f'            "image_description": {repr(vecs["image_description"])},',
+            f'            "img_desc": {repr(vecs["img_desc"])},',
             '        },',
             f'        "metadata": {{',
             f'            "name": {repr(meta["name"])},',

@@ -12,12 +12,17 @@ embed(data: dict) -> dict
 
 * `text`: raw text input
 * `tags`: list of tag keys
-* `image_description`: visual description
+* `img_desc`: visual description
 
 ### Output
 
-* `preprocessed`: normalized + expanded inputs
-* `vectors`: embeddings for `text`, `aug_text`, `aug_tags`, `image_description`
+* `sig_k`: keyword expansion count, determine weighting of each vector
+* `preprocessed`: normalized + expanded inputs with keys:
+  * `text`: raw text input
+  * `aug_text`: expanded text input
+  * `aug_tags`: expanded tag input
+  * `img_desc`: visual description
+* `vectors`: embeddings for `text`, `aug_text`, `aug_tags`, `img_desc`
 
 ## Responsibilities
 

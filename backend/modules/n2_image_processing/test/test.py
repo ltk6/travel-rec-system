@@ -1,23 +1,25 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict
+from typing import Any
 from pathlib import Path
 import sys
 
 # ─────────────────────────────────────────────
-# SAFE IMPORT PATH (dynamic project root)
+# SAFE IMPORT PATH
 # ─────────────────────────────────────────────
 CURRENT = Path(__file__).resolve()
 
 for parent in CURRENT.parents:
-    if (parent / "n1_embedding").exists():
-        sys.path.insert(0, str(parent))
+    if (parent / "backend").exists():
+        REPO_ROOT = parent
         break
 else:
-    raise RuntimeError("Could not locate project root containing 'n1_embedding'")
+    raise RuntimeError("Could not locate repo root (missing 'backend' folder)")
 
-from n1_embedding import embed
+sys.path.insert(0, str(REPO_ROOT))
+
+from backend.modules.n2_image_processing import process_image
 
 
 # ─────────────────────────────────────────────
@@ -48,72 +50,31 @@ def save_json(result: dict, filename: str):
 
 
 # ─────────────────────────────────────────────
+# IMAGE TO BYTES
+# ─────────────────────────────────────────────
+def image_to_bytes(path: str) -> bytes:
+    return Path(path).read_bytes()
+
+
+# ─────────────────────────────────────────────
 # TEST DATA
 # ─────────────────────────────────────────────
-
-USER_TESTS = [
-    {
-        "text": "Tôi muốn một chuyến đi yên tĩnh gần thiên nhiên",
-        "tags": ["thiên nhiên", "yên tĩnh", "couple"],
-        "img_desc": "A couple walking slowly on a quiet beach during sunset, warm golden light reflecting on the water, relaxed and intimate atmosphere",
-        "name": "user_1"
-    },
-    {
-        "text": "Muốn đi du lịch chữa lành tâm trí sau thời gian stress",
-        "tags": ["healing", "relax", "nature"],
-        "img_desc": "A person sitting quietly by a misty lake at sunrise, surrounded by mountains and soft fog, conveying calmness, healing, and emotional reset",
-        "name": "user_2"
-    },
-    {
-        "text": "Đi chơi cuối tuần nhẹ nhàng với người yêu",
-        "tags": ["couple", "weekend", "romantic"],
-        "img_desc": "",
-        "name": "user_3"
-    },
+TEST_SET = [
+    {"image": image_to_bytes(Path(__file__).parent / "city.png"), "name": "image_3"},
 ]
-
-LOCATION_TESTS = [
-    {
-        "text": "Busy coastal city with nightlife and beaches",
-        "tags": ["beach", "city", "nightlife"],
-        "img_desc": "",
-        "name": "loc_1"
-    },
-    {
-        "text": "Quiet mountain town surrounded by forests and mist",
-        "tags": ["mountain", "forest", "quiet"],
-        "img_desc": "",
-        "name": "loc_2"
-    },
-    {
-        "text": "Historic city with temples, culture, and street food",
-        "tags": ["culture", "history", "food"],
-        "img_desc": "",
-        "name": "loc_3"
-    },
-]
-
 
 # ─────────────────────────────────────────────
 # RUNNER
 # ─────────────────────────────────────────────
-def run_tests(test_set: list[dict], prefix: str):
-    for t in test_set:
-        result = embed({
-            "text": t.get("text"),
-            "tags": t.get("tags"),
-            "img_desc": t.get("img_desc"),
-        })
-
-        save_json(result, f"{prefix}_{t['name']}.json")
+def run_tests():
+    for t in TEST_SET:
+        result = process_image({"image": t["image"]})
+        save_json(result, f"image_{t['name']}.json")
 
 
 # ─────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
-    print("Running USER tests...")
-    run_tests(USER_TESTS, "user")
-
-    print("Running LOCATION tests...")
-    run_tests(LOCATION_TESTS, "location")
+    print("Running N2 IMAGE tests...")
+    run_tests()

@@ -1,19 +1,6 @@
-﻿"""
-embedder.py
-===========
-
-Loads and runs inference for the sentence embedding model used in
-multi-vector semantic retrieval.
-
-Converts multiple input strings (per semantic channel) into normalized
-vector representations using a shared embedding model.
-
-Recommended model: BAAI/bge-m3
-  568M params · 1024-dim · 100+ languages · top VN-MTEB retrieval score
-
-Drop-in alternatives (change MODEL_NAME only):
-  AITeamVN/Vietnamese_Embedding   — BGE-M3 fine-tuned on 300k+ Vietnamese triplets
-  intfloat/multilingual-e5-large  — 560M params, strong multilingual alternative
+"""
+Loads the sentence embedding model and converts text channels into normalized vectors.
+Model: BAAI/bge-m3 (568M params, 1024-dim, 100+ languages, top VN-MTEB score).
 """
 
 from __future__ import annotations
@@ -40,37 +27,29 @@ def get_model():
 
 def embed_texts(texts: List[str]) -> List[Optional[List[float]]]:
     """
-    Convert a list of strings into normalized embeddings.
-
-    Empty or whitespace-only strings return None at their index.
+    Encode strings into normalized embeddings. Empty strings yield None.
     """
-    model = get_model()
-
     if not texts:
         return []
 
-    # Collect only non-empty texts, tracking their original indices
-    valid_texts: List[str] = []
-    valid_indices: List[int] = []
+    model = get_model()
 
-    for i, t in enumerate(texts):
-        if t and t.strip():
-            valid_texts.append(t)
-            valid_indices.append(i)
+    # Separate non-empty texts, track original positions
+    valid = [(i, t) for i, t in enumerate(texts) if t and t.strip()]
+    if not valid:
+        return [None] * len(texts)
 
-    if not valid_texts:
-        return [] * len(texts)
-
+    indices, strings = zip(*valid)
     vectors = model.encode(
-        valid_texts,
+        list(strings),
         normalize_embeddings=True,
         batch_size=32,
         show_progress_bar=False,
     ).tolist()
 
-    # Reconstruct full output list, inserting None for empty slots
+    # Reconstruct with None for empty slots
     output: List[Optional[List[float]]] = [None] * len(texts)
-    for vec, idx in zip(vectors, valid_indices):
+    for idx, vec in zip(indices, vectors):
         output[idx] = vec
 
     return output

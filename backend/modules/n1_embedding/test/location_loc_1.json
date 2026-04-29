@@ -1,9 +1,10 @@
 {
+  "sig_k": 2,
   "preprocessed": {
     "text": "Busy coastal city with nightlife and beaches",
     "aug_text": "Busy coastal city with nightlife and beaches sandy coastal shoreline environment with direct sea access, wave conditions, and open ocean views land edge meeting the sea, featuring cliffs, beaches, coves, and coastal geological formations",
     "aug_tags": "sandy beach sun sea swimming tropical coast urban city modern amenities transport nightlife dining nightlife bar club live music late night social entertainment",
-    "image_description": ""
+    "img_desc": ""
   },
   "vectors": {
     "text": [
@@ -3084,6 +3085,6 @@
       -0.04313969239592552,
       -0.02599494718015194
     ],
-    "image_description": null
+    "img_desc": null
   }
 }

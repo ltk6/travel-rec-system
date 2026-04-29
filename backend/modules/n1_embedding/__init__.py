@@ -1,68 +1,51 @@
-﻿from __future__ import annotations
+"""
+n1_embedding — Unified embedding API.
+Preprocesses multi-channel inputs, generates vectors, and returns signal metadata.
+"""
+
+from __future__ import annotations
 
 from typing import Dict, Any
 
 from .embedder import embed_texts
 from .preprocessor import build_inputs
-from .maps import stats as map_stats
-
 
 def embed(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Unified embedding API.
+    Single entry point for the embedding pipeline.
 
-    ── INPUT ────────────────────────────────────────────
-    {
-        "text":              str | None,
-        "tags":              list[str] | None,
-        "image_description": str | None,
-    }
+    Input:  { text, tags, img_desc }
+    Output: { preprocessed, vectors, sig_k }
 
-    ── OUTPUT ───────────────────────────────────────────
-    {
-        "preprocessed": {
-            "text":               str,
-            "aug_text":           str,
-            "aug_tags":           str,
-            "image_description":  str
-        },
-        "vectors": {
-            "text":               [...] | None,
-            "aug_text":           [...] | None,
-            "aug_tags":           [...] | None,
-            "image_description":  [...] | None,
-        }
-    }
+    sig_k = keyword expansion signal strength (count of expansions detected).
     """
     if not isinstance(data, dict):
         raise ValueError("embed() accepts a single dict only")
 
     preprocessed = build_inputs(
-        text                = data.get("text", ""),
-        tags                = data.get("tags", []),
-        image_description   = data.get("image_description", ""),
+        text     = data.get("text", ""),
+        tags     = data.get("tags", []),
+        img_desc = data.get("img_desc", ""),
     )
 
-    vectors = embed_texts([
-            preprocessed["text"],
-            preprocessed["aug_text"],
-            preprocessed["aug_tags"],
-            preprocessed["image_description"],
-        ])
+    # Channel order: text, aug_text, aug_tags, img_desc
+    channels = ["text", "aug_text", "aug_tags", "img_desc"]
+    vectors = embed_texts([preprocessed[ch] for ch in channels])
 
     return {
+        "sig_k":        preprocessed["kw_count"],
         "preprocessed": {
-            "text":               preprocessed["text"],
-            "aug_text":           preprocessed["aug_text"],
-            "aug_tags":           preprocessed["aug_tags"],
-            "image_description":  preprocessed["image_description"],
+            "text":     preprocessed["text"],
+            "aug_text": preprocessed["aug_text"],
+            "aug_tags": preprocessed["aug_tags"],
+            "img_desc": preprocessed["img_desc"],
         },
         "vectors": {
-            "text":               vectors[0],
-            "aug_text":           vectors[1],
-            "aug_tags":           vectors[2],
-            "image_description":  vectors[3],
-        },
+            "text":     vectors[0],
+            "aug_text": vectors[1],
+            "aug_tags": vectors[2],
+            "img_desc": vectors[3],
+        },  
     }
 
-__all__ = ["embed", "map_stats"]
+__all__ = ["embed"]

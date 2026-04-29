@@ -37,7 +37,7 @@ def init_db():
             text vector(1024),
             aug_text vector(1024),
             aug_tags vector(1024),
-            image_description vector(1024),
+            img_desc vector(1024),
 
             metadata JSONB,
             constraints JSONB
@@ -52,7 +52,7 @@ def init_db():
             text vector(1024),
             aug_text vector(1024),
             aug_tags vector(1024),
-            image_description vector(1024),
+            img_desc vector(1024),
 
             metadata JSONB,
             geo JSONB
@@ -69,7 +69,7 @@ def _format_vectors(row: Dict[str, Any]) -> Dict[str, Any]:
         "text": row.get("text"),
         "aug_text": row.get("aug_text"),
         "aug_tags": row.get("aug_tags"),
-        "image_description": row.get("image_description")
+        "img_desc": row.get("img_desc")
     }
 
 def _attach_image(location_dict: Dict[str, Any]) -> Dict[str, Any]:
@@ -97,7 +97,7 @@ def save_location(location_data: Dict[str, Any]) -> Dict[str, Any]:
                 text,
                 aug_text,
                 aug_tags,
-                image_description,
+                img_desc,
                 metadata,
                 geo
             )
@@ -107,7 +107,7 @@ def save_location(location_data: Dict[str, Any]) -> Dict[str, Any]:
                 text = EXCLUDED.text,
                 aug_text = EXCLUDED.aug_text,
                 aug_tags = EXCLUDED.aug_tags,
-                image_description = EXCLUDED.image_description,
+                img_desc = EXCLUDED.img_desc,
                 metadata = EXCLUDED.metadata,
                 geo = EXCLUDED.geo;
         """,
@@ -117,7 +117,7 @@ def save_location(location_data: Dict[str, Any]) -> Dict[str, Any]:
             vectors.get("text"),
             vectors.get("aug_text"),
             vectors.get("aug_tags"),
-            vectors.get("image_description"),
+            vectors.get("img_desc"),
 
             json.dumps(location_data.get("metadata", {})),
             json.dumps(location_data.get("geo", {})),
@@ -151,7 +151,7 @@ def get_all_locations() -> Dict[str, Any]:
                 text,
                 aug_text,
                 aug_tags,
-                image_description,
+                img_desc,
                 metadata,
                 geo
             FROM locations;
@@ -200,7 +200,7 @@ def filter_locations(budget: float, duration: int) -> Dict[str, Any]:
                 text,
                 aug_text,
                 aug_tags,
-                image_description,
+                img_desc,
                 metadata,
                 geo
             FROM locations
@@ -249,7 +249,7 @@ def save_user_profile(user_data: Dict[str, Any]) -> Dict[str, Any]:
                 text,
                 aug_text,
                 aug_tags,
-                image_description,
+                img_desc,
                 metadata,
                 constraints
             )
@@ -259,7 +259,7 @@ def save_user_profile(user_data: Dict[str, Any]) -> Dict[str, Any]:
                 text = EXCLUDED.text,
                 aug_text = EXCLUDED.aug_text,
                 aug_tags = EXCLUDED.aug_tags,
-                image_description = EXCLUDED.image_description,
+                img_desc = EXCLUDED.img_desc,
                 metadata = EXCLUDED.metadata,
                 constraints = EXCLUDED.constraints;
         """,
@@ -268,7 +268,7 @@ def save_user_profile(user_data: Dict[str, Any]) -> Dict[str, Any]:
             user_data.get("text"),
             user_data.get("aug_text"),
             user_data.get("aug_tags"),
-            user_data.get("image_description"),
+            user_data.get("img_desc"),
             json.dumps(user_data.get("metadata", {})),
             json.dumps(user_data.get("constraints", {})),
         ))
