@@ -9,7 +9,7 @@ INPUT:
 
 OUTPUT:
 {
-    "image_description": str
+    "img_desc": str
 }
 """
 
