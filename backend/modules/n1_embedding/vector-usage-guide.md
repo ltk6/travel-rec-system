@@ -9,7 +9,7 @@
 | `text`     | Raw user input         | High-precision, literal intent        |
 | `aug_text` | Expanded semantic text | Contextual + emotional interpretation |
 | `aug_tags` | Expanded tag strings   | Stable semantic anchor                |
-| `image`    | Image description      | Visual alignment (supplementary)      |
+| `image`    | Image description      | Visual alignment                      |
 
 `text` and `aug_text` are both needed and genuinely different:
 - `text` captures **what the user literally said** — high precision for detailed input
@@ -19,32 +19,27 @@
 
 ---
 
-## Text Quality Score
-
-The system should dynamically adjusts how much each channel contributes based on **text quality**.
-
-```python
-def score_text_quality(text: str) -> float:
-    """0.0 = vague/empty, 1.0 = rich and specific. Saturates at 30 words."""
-    if not text or not text.strip():
-        return 0.0
-    return min(len(text.split()) / 30, 1.0)
-```
-
----
-
 ## Channel Weights
 
-As text quality rises:
-- `text` gains weight — user said something precise, trust it
-- `aug_text` loses weight — expansions risk overwriting specific intent with generic travel vocabulary
-- `aug_tags` recedes to anchor role
-- `image` fades to near-irrelevant
+The system dynamically adjusts channel contributions based on **sig_k**.
 
-| Input Quality   | System Behavior                                   |
-| --------------- | ------------------------------------------------- |
-| Low (vague)     | Relies on `aug_text` + `aug_tags` to infer intent |
-| Medium          | Balanced interpretation across channels           |
-| High (detailed) | Prioritizes `text`, reduces expansion influence   |
+`sig_k` is the **keyword expansion count** extracted from `text` during preprocessing.  
+It measures how much semantic enrichment was required to understand the input.
 
----
+- Low `sig_k` → input is weak with low keyword count
+- High `sig_k` → input is already rich with high keyword count
+
+## Base Channel Weights
+
+All inputs start from a neutral baseline:
+| text | tags | image|
+|------|------|------|
+|0.4  | 0.4  | 0.2   |
+
+## sig_k-based Channel Weighting
+| sig_k | text | aug_text | aug_tags | img_desc | reasoning |
+|-------|------|----------|----------|----------|----------|
+| 0  | 0.3 | 0.0 | 0.5 | 0.2 | aug_text is meaningless, text is also probably weak, slight boost to aug_tags |
+| 1  | 0.1 | 0.3 | 0.4 | 0.2 | aug_text has 1 expansion, and probably is a lot stronger than text at this point |
+| 2  | 0.2 | 0.2 | 0.4 | 0.2 | aug_text has 2 expansion and remain balanced |
+| 3+ | 0.3 | 0.1 | 0.4 | 0.2 | aug_text rapidly loose value due to high expansion count |
