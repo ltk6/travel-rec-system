@@ -1,10 +1,24 @@
 """
-n8_module/app.py
-================
+n8_api/app.py
+=============
 N8 – API Orchestrator (Flask)
 
 Pipeline:
-N2 (image) → N1 (embed) → N3 (db) → N4 (rank locations)
+N2 (image → img_desc) → N1 (embed) → N3 (db) → N4 (rank locations)
+
+Contract summary:
+─────────────────────────────────────────────
+N2 input:  { image: bytes }
+N2 output: { img_desc: str }
+
+N1 input:  { text, tags, img_desc }
+N1 output: { sig_k, preprocessed, vectors: { text, aug_text, aug_tags, img_desc } }
+
+N3 output: { status, total, data: [{ location_id, vectors: { text, aug_text, aug_tags, image_description }, metadata, geo }] }
+
+N4 input:  { sig_k, user_vectors: { text, aug_text, aug_tags, img_desc }, locations: [{ location_id, location_vectors: { text, tag } }], top_k }
+N4 output: { locations: [{ location_id, score, reason }] }
+─────────────────────────────────────────────
 """
 
 from __future__ import annotations
@@ -30,6 +44,7 @@ from n3_database import get_all_locations
 from modules.n1_embedding import embed
 from modules.n2_image_processing import process_image
 from modules.n4_location_ranking import rank_locations
+from modules.n4_location_ranking.rank_locations import _get_weights
 
 # ── Logging ───────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -56,7 +71,18 @@ def _get_json():
 
 
 def _safe_vec(v):
-    return v if isinstance(v, list) else []
+    """Ensure value is a Python list. Handles numpy arrays from pgvector."""
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return v
+    # numpy arrays from pgvector
+    if hasattr(v, 'tolist'):
+        return v.tolist()
+    try:
+        return list(v)
+    except (TypeError, ValueError):
+        return []
 
 
 # ═════════════════════════════════════════════════════════════
@@ -90,68 +116,76 @@ def recommend():
     if not text and not tags:
         return _err("Provide text or tags")
 
-    # ── N2 ─────────────────────────────
+    # ── N2 — Image → img_desc ──────────────────
+    img_desc = ""
     if image_b64:
         try:
-            img = base64.b64decode(image_b64)
-            res = process_image({"image": img})
-            image_desc = res.get("image_description", "")
+            img_bytes = base64.b64decode(image_b64)
+            n2_result = process_image({"image": img_bytes})
+            img_desc = n2_result.get("img_desc", "")
         except Exception as e:
             logger.warning(f"N2 failed: {e}")
-            image_desc = ""
-    else:
-        image_desc = ""
 
-    # ── N1 ─────────────────────────────
-    embed_result = embed({
+    # ── N1 — Embed user input ──────────────────
+    # N1 contract: { text, tags, img_desc } → { sig_k, preprocessed, vectors }
+    n1_result = embed({
         "text": text,
-        "image_description": image_desc,
-        "tags": tags
+        "tags": tags,
+        "img_desc": img_desc,
     })
 
-    vectors = embed_result.get("vectors", {})
+    sig_k = n1_result.get("sig_k", 0)
+    vectors = n1_result.get("vectors", {})
 
+    # User vectors: text, aug_text, aug_tags, img_desc
     user_vectors = {
-        "emotion": _safe_vec(vectors.get("emotion")),
-        "context": _safe_vec(vectors.get("context")),
-        "image":   _safe_vec(vectors.get("image")),
-        "tag":     _safe_vec(vectors.get("tag")),
+        "text":     _safe_vec(vectors.get("text")),
+        "aug_text": _safe_vec(vectors.get("aug_text")),
+        "aug_tags": _safe_vec(vectors.get("aug_tags")),
+        "img_desc": _safe_vec(vectors.get("img_desc")),
     }
 
-    # ── N3 ─────────────────────────────
-    locations = get_all_locations()
+    # ── N3 — Fetch locations from DB ───────────
+    # N3 returns { status, total, data: [...] }
+    db_result = get_all_locations()
+    locations = db_result.get("data", []) if isinstance(db_result, dict) else []
 
-    # ── N4 INPUT FORMAT ─────────────────────────────
+    # ── Build N4 input ─────────────────────────
+    # N4 expects location_vectors: { text, tag }
+    # N3 DB stores: text, aug_text, aug_tags, image_description
+    # Mapping: N3.text → N4.text, N3.aug_tags → N4.tag
     n4_locations = []
     loc_map = {}
 
     for loc in locations:
         loc_id = loc.get("location_id", "unknown")
-
-        vectors = loc.get("vectors", {}) or {}
+        db_vectors = loc.get("vectors", {}) or {}
 
         n4_locations.append({
             "location_id": loc_id,
             "location_vectors": {
-                "text": _safe_vec(vectors.get("text")),
-                "tag":  _safe_vec(vectors.get("tag")),
+                "text": _safe_vec(db_vectors.get("text")),
+                "tag":  _safe_vec(db_vectors.get("aug_tags")),
             }
         })
 
         loc_map[loc_id] = {
-            "vectors": vectors,
+            "vectors": db_vectors,
             "metadata": loc.get("metadata", {}),
-            "geo": loc.get("geo", {})
+            "geo": loc.get("geo", {}),
+            "image_path": loc.get("image_path", ""),
         }
 
-    # ── N4 ─────────────────────────────
-    result = rank_locations({
+    # ── N4 — Rank locations ────────────────────
+    # N4 contract: { sig_k, user_vectors, locations, top_k }
+    n4_result = rank_locations({
+        "sig_k": sig_k,
         "user_vectors": user_vectors,
         "locations": n4_locations,
-        "top_k": top_k
+        "top_k": top_k,
     })
 
-    ranked = result.get("locations", [])
+    ranked = n4_result.get("locations", [])
 
     return jsonify({
         # ─────────────────────────────
@@ -163,15 +197,15 @@ def recommend():
                 "score": r.get("score", 0),
                 "reason": r.get("reason", ""),
 
-                "vectors": loc_map.get(r["location_id"], {}).get("vectors", {}),
                 "metadata": loc_map.get(r["location_id"], {}).get("metadata", {}),
-                "geo": loc_map.get(r["location_id"], {}).get("geo", {})
+                "geo": loc_map.get(r["location_id"], {}).get("geo", {}),
+                "image_path": loc_map.get(r["location_id"], {}).get("image_path", ""),
             }
             for r in ranked
         ],
 
         # ─────────────────────────────
-        # FULL TRACE (NEW — EVERYTHING)
+        # FULL TRACE (EVERYTHING)
         # ─────────────────────────────
         "trace": {
             # ─── USER SIDE ───
@@ -180,33 +214,38 @@ def recommend():
                     "text": text,
                     "tags": tags,
                     "constraints": constraints,
-                    "has_image": bool(image_b64)
+                    "has_image": bool(image_b64),
                 },
-                "image_processing": {
-                    "image_description": image_desc
+                "n2_image": {
+                    "img_desc": img_desc,
                 },
-                "vectors": user_vectors,
+                "n1_embedding": {
+                    "sig_k": sig_k,
+                    "preprocessed": n1_result.get("preprocessed", {}),
+                },
+                "user_vectors": user_vectors,
                 "vector_dims": {
-                    k: len(v) if v is not None else 0
+                    k: len(v) if v else 0
                     for k, v in user_vectors.items()
-                }
+                },
             },
 
             # ─── LOCATION SIDE (RAW BEFORE RANKING) ───
             "locations_raw": [
                 {
                     "location_id": loc.get("location_id"),
-                    "vectors": loc.get("vectors", {}),
                     "metadata": loc.get("metadata", {}),
-                    "geo": loc.get("geo", {})
+                    "geo": loc.get("geo", {}),
                 }
                 for loc in locations
             ],
 
             # ─── RANKING OUTPUT ───
             "ranking": {
+                "sig_k": sig_k,
+                "weights_used": _get_weights(sig_k),
                 "top_k": top_k,
-                "ranked": ranked
+                "ranked": ranked,
             },
 
             # ─── SYSTEM DEBUG ───
@@ -216,10 +255,10 @@ def recommend():
                     "n1": "embedding",
                     "n2": "image_processing",
                     "n3": "database_fetch",
-                    "n4": "ranking"
-                }
-            }
-        }
+                    "n4": "ranking",
+                },
+            },
+        },
     })
 
 # ═════════════════════════════════════════════════════════════
@@ -227,4 +266,4 @@ def recommend():
 # ═════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False)
