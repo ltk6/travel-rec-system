@@ -1,119 +1,117 @@
-import unittest
-from unittest.mock import patch, MagicMock
-from backend.modules.n5_activity_generation.n5_activity_generator import generate_activities, generate_activities_hybrid
-from backend.modules.n5_activity_generation.n5_activity_templates import ACTIVITY_TEMPLATES
+"""
+test_n5_activity_generator.py — Kiểm tra N5 Activity Generator
+Chạy từ root project: python -m backend.modules.n5_activity_generation.test_n5_activity_generator
+"""
+import sys, json
 
-class TestN5ActivityGenerator(unittest.TestCase):
-    # ======== CÁC TEST CASES TRƯỚC ĐÓ ========
-    def test_generate_with_matching_tags(self):
-        user_tags = ["beach", "sea"]
-        locations = [{"name": "Phú Quốc"}, {"name": "Hạ Long"}]
-        constraints = {"budget": 10000000, "max_time_per_day": 480}
-        
-        result = generate_activities(user_tags, locations, constraints)
-        self.assertTrue(len(result) > 0)
-        
-        # Verify the highest score activity has relevant tags
-        top_activity = result[0]
-        self.assertTrue(top_activity["match_score"] > 0)
-        self.assertTrue(any(tag in top_activity["tags"] for tag in user_tags))
-
-    def test_budget_constraints(self):
-        user_tags = ["culture"]
-        locations = [{"name": "Hội An"}]
-        constraints = {"budget": 100000, "max_time_per_day": 480}
-        
-        result = generate_activities(user_tags, locations, constraints)
-        for act in result:
-            self.assertTrue(act["cost"] <= 50000)
-
-    def test_time_constraints(self):
-        user_tags = ["relax"]
-        locations = [{"name": "Đà Lạt"}]
-        constraints = {"budget": 1000000, "max_time_per_day": 60}
-        
-        result = generate_activities(user_tags, locations, constraints)
-        for act in result:
-            self.assertTrue(act["estimated_time_minutes"] <= 60)
-
-    def test_missing_location(self):
-        user_tags = ["relax"]
-        locations = [{"name": "Not Exist City"}, {"name": "Đà Lạt"}]
-        constraints = {"budget": 1000000, "max_time_per_day": 400}
-        
-        result = generate_activities(user_tags, locations, constraints)
-        for act in result:
-            self.assertEqual(act["location_name"], "Đà Lạt")
-
-    def test_sorting_by_match_score(self):
-        user_tags = ["relax", "photography"]
-        locations = [{"name": "Đà Lạt"}, {"name": "Phú Quốc"}]
-        constraints = {"budget": 1000000, "max_time_per_day": 400}
-        
-        result = generate_activities(user_tags, locations, constraints)
-        
-        scores = [act["match_score"] for act in result]
-        self.assertEqual(scores, sorted(scores, reverse=True))
-
-    def test_limit_result_size(self):
-        user_tags = ["culture", "relax", "food", "nature", "history", "photography", "adventure", "fun"]
-        locations = [
-            {"name": "Hội An"}, {"name": "Sa Pa"}, {"name": "Hạ Long"}, 
-            {"name": "Huế"}, {"name": "Đà Lạt"}
-        ]
-        constraints = {"budget": 100000000, "max_time_per_day": 1000}
-        result = generate_activities(user_tags, locations, constraints)
-        self.assertTrue(len(result) <= 12)
-
-    # ======== 3 TEST CASES MỚI THEO YÊU CẦU ========
-    
-    def test_user_likes_relax_beach(self):
-        """Test case 1: User thích relax + beach"""
-        user_tags = ["relax", "beach"]
-        locations = [{"name": "Phú Quốc"}, {"name": "Hội An"}, {"name": "Hạ Long"}]
-        constraints = {"budget": 10000000, "max_time_per_day": 480}
-        
-        result = generate_activities(user_tags, locations, constraints)
-        self.assertTrue(len(result) > 0)
-        
-        # Mọi activity trả về nếu có score > 0 thì phải có tag relax hoặc beach
-        top_activity = result[0]
-        self.assertTrue("relax" in top_activity["tags"] or "beach" in top_activity["tags"])
-        
-    def test_user_likes_culture_history(self):
-        """Test case 2: User thích culture + history"""
-        user_tags = ["culture", "history"]
-        locations = [{"name": "Huế"}, {"name": "Hội An"}, {"name": "Sa Pa"}]
-        constraints = {"budget": 10000000, "max_time_per_day": 480}
-        
-        result = generate_activities(user_tags, locations, constraints)
-        self.assertTrue(len(result) > 0)
-        
-        # Top 3 (phần lớn) nên thuộc các activity văn hoá lịch sử (vì điểm cao hơn được sếp hạng)
-        for idx in range(min(3, len(result))):
-            act = result[idx]
-            self.assertTrue("culture" in act["tags"] or "history" in act["tags"])
-
-    def test_user_has_low_budget(self):
-        """Test case 3: User có ngân sách thấp"""
-        user_tags = ["relax", "nature", "adventure"]
-        locations = [{"name": "Sa Pa"}, {"name": "Nha Trang"}, {"name": "Huế"}]
-        
-        # Ngân sách tổng là 150_000 => limit activity = 75_000
-        constraints = {"budget": 150000, "max_time_per_day": 480}
-        
-        result = generate_activities(user_tags, locations, constraints)
-        
-        for act in result:
-            self.assertTrue(act["cost"] <= 75000)
-            
-        # Kiểm tra xem các module lớn có bị lọc đi không (VD: VinWonders 800k)
-        names = [act["name"] for act in result]
-        self.assertNotIn("Chơi VinWonders", names)
-        self.assertNotIn("Trekking Fansipan", names)
+from backend.modules.n5_activity_generation.n5_activity_generator import (
+    generate_activities,
+    _is_sightseeing,
+)
 
 
-# ======== TEST CASES CHO HYBRID APPROACH ========
+# ──────────────────────────────────────────────────────────
+# SAMPLE INPUT từ N4
+# ──────────────────────────────────────────────────────────
+SAMPLE_INPUT_SINGLE = {
+    "user": {
+        "text": "Tôi muốn đi nơi thiên nhiên, ngắm cảnh đẹp, chụp ảnh",
+        "image_description": None,
+        "tags": ["nature", "photography", "sightseeing", "relax"],
+    },
+    "locations": [
+        {
+            "location_id": "loc_sapa_001",
+            "metadata": {
+                "name": "Sa Pa",
+                "description": "Thị trấn vùng cao Lào Cai với ruộng bậc thang",
+                "tags": ["mountain", "trekking", "nature", "cool_weather", "photography"],
+            }
+        }
+    ],
+    "constraints": {
+        "budget": 5_000_000,
+        "duration": 3,
+        "people": 2,
+        "time_of_day": "morning",
+    }
+}
+
+SAMPLE_INPUT_MULTI = {
+    "user": {
+        "text": "Gia đình 4 người, thích biển và ẩm thực",
+        "image_description": None,
+        "tags": ["beach", "food", "relax", "family"],
+    },
+    "locations": [
+        {
+            "location_id": "loc_pq_001",
+            "metadata": {
+                "name": "Phú Quốc",
+                "description": "Đảo ngọc phía Nam",
+                "tags": ["beach", "sea", "resort", "seafood"],
+            }
+        },
+        {
+            "location_id": "loc_nt_001",
+            "metadata": {
+                "name": "Nha Trang",
+                "description": "Thành phố biển năng động",
+                "tags": ["beach", "sea", "entertainment", "seafood"],
+            }
+        }
+    ],
+    "constraints": {
+        "budget": 8_000_000,
+        "duration": 5,
+        "people": 4,
+        "time_of_day": None,
+    }
+}
+
+SAMPLE_INPUT_UNKNOWN_LOCATION = {
+    "user": {
+        "text": "Muốn khám phá nơi mới",
+        "image_description": None,
+        "tags": ["adventure", "nature"],
+    },
+    "locations": [
+        {
+            "location_id": "loc_unknown_xyz",
+            "metadata": {
+                "name": "Bản Giốc",
+                "description": "Thác nước hùng vĩ ở Cao Bằng",
+                "tags": ["waterfall", "nature", "adventure", "remote"],
+            }
+        }
+    ],
+    "constraints": {
+        "budget": 3_000_000,
+        "duration": 2,
+        "people": 2,
+        "time_of_day": None,
+    }
+}
+
+
+def run_test(name: str, input_data: dict):
+    print(f"\n{'='*60}")
+    print(f"  TEST: {name}")
+    print(f"{'='*60}")
+
+    result = generate_activities(input_data)
+    activities = result.get("activities", [])
+
+    print(f"\n  Total activities generated: {len(activities)}")
+
+    # Per-location breakdown
+    loc_counts = {}
+    type_counts = {}
+    sightseeing_count = 0
+
+    for act in activities:
+        loc = act.get("location_id", "?")
+        loc_counts[loc] = loc_counts.get(loc, 0) + 1
 
 class TestN5HybridGenerator(unittest.TestCase):
     """

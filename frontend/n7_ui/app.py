@@ -160,6 +160,8 @@ image_b64 = ""
 if uploaded_image:
     img = Image.open(uploaded_image)
     st.image(img, caption="Uploaded Image")
+    # getvalue() trả về toàn bộ bytes bất kể vị trí file pointer sau Image.open()
+    image_b64 = base64.b64encode(uploaded_image.getvalue()).decode("utf-8")
 
     # encode image for backend (N2)
     uploaded_image.seek(0)
