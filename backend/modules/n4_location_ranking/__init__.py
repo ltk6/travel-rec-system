@@ -7,33 +7,21 @@ This module ranks travel locations using precomputed embeddings
 and structured constraints.
 
 It combines:
-- User semantic intent (text, image, tags)
-- User vector representations (emotion/context/image/tag)
+- User vectors from N1 (text/aug_text/aug_tags/img_desc)
 - Location embeddings (text/tag)
-- Contextual signals (geo proximity, budget, duration constraints)
+- sig_k-based dynamic channel weighting
 
 ─────────────────────────────────────────────
 INPUT
 ─────────────────────────────────────────────
 {
-    "user_input": {
-        "text": str | None,
-        "image_description": str | None,
-        "tags": list[str] | None
-    },
+    "sig_k": int,
 
     "user_vectors": {
-        "emotion": list[float] | None,
-        "context": list[float] | None,
-        "image": list[float] | None,
-        "tag": list[float] | None
-    },
-
-    "context": {
-        "user_location": {
-            "lat": float | None,
-            "lng": float | None
-        }
+        "text":     list[float] | None,
+        "aug_text": list[float] | None,
+        "aug_tags": list[float] | None,
+        "img_desc": list[float] | None
     },
 
     "locations": [
