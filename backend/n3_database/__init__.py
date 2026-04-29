@@ -12,7 +12,7 @@ Input:
         "text": str,
         "aug_text": str,
         "aug_tags": str,
-        "image_description": str
+        "img_desc": str
     },
 
     "metadata": dict,
@@ -35,7 +35,7 @@ Output:
             "text": str,
             "aug_text": str,
             "aug_tags": str,
-            "image_description": str
+            "img_desc": str
         },
 
         "metadata": dict,
