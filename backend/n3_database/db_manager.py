@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import logging
 from typing import List, Dict, Any
@@ -174,57 +174,6 @@ def get_all_locations() -> Dict[str, Any]:
             results.append(_attach_image(formatted))
 
         # Trả về Dict chuẩn ý sếp Khanh
-        return {
-            "status": "success",
-            "total": len(results),
-            "data": results
-        }
-
-    except Exception as e:
-        logger.error(f"Lỗi truy vấn: {e}")
-        return {"status": "error", "message": str(e), "data": []}
-
-def filter_locations(budget: float, duration: int) -> Dict[str, Any]:
-    """
-    Lọc địa điểm theo ngân sách và thời gian.
-    Input: budget (float), duration (int). (Có thể gom thành 1 dict nếu cần)
-    Output: dict chứa status, total và danh sách data.
-    """
-    try:
-        conn = _get_connection()
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT
-                location_id,
-                text,
-                aug_text,
-                aug_tags,
-                img_desc,
-                metadata,
-                geo
-            FROM locations
-            WHERE (metadata->>'price_level')::numeric <= %s
-              AND (metadata->>'estimated_duration')::numeric <= %s;
-        """,
-        (budget, duration))
-
-        rows = cur.fetchall()
-        conn.close()
-
-        results = []
-        for row in rows:
-            row_dict = dict(row)
-
-            formatted = {
-                "location_id": row_dict["location_id"],
-                "vectors": _format_vectors(row_dict),   # 🔥 FIXED
-                "metadata": row_dict.get("metadata"),
-                "geo": row_dict.get("geo"),
-            }
-
-            results.append(_attach_image(formatted))
-
         return {
             "status": "success",
             "total": len(results),
