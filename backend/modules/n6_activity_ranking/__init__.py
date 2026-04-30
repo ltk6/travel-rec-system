@@ -20,19 +20,21 @@ IMPORTANT:
 INPUT
 ─────────────────────────────────────────────
 {
+    "sig_k": int,
+
     # ───────── USER INPUT ─────────
     "user_input": {
         "text": str | None,
-        "image_description": str | None,
+        "img_desc": str | None,
         "tags": list[str] | None
     },
 
     # ───────── USER VECTORS ─────────
     "user_vectors": {
-        "emotion": list[float] | None,
-        "context": list[float] | None,
-        "image": list[float] | None,
-        "tag": list[float] | None
+        "text": list[float] | None,
+        "aug_text": list[float] | None,
+        "aug_tags": list[float] | None,
+        "img_desc": list[float] | None
     },
 
     # ───────── CONTEXT ─────────
@@ -73,7 +75,6 @@ INPUT
             "vectors": {
                 "text": list[float] | None,
                 "tag": list[float] | None,
-                "intent": list[float] | None
             }
         }
     ],
