@@ -1,7 +1,7 @@
 """
-test_n5_activity_generator.py — Kiểm tra N5 Activity Generator
+unit_test.py — Kiểm tra N5 Activity Generator
 Chạy từ thư mục gốc dự án:
-    python -m unittest backend.modules.n5_activity_generation.test_n5_activity_generator -v
+    python -m unittest backend.modules.n5_activity_generation.test.unit_test -v
 """
 import unittest
 from unittest.mock import patch
@@ -20,7 +20,7 @@ def _make_input(tags, location_name="Sa Pa", location_tags=None,
     return {
         "user": {
             "text": "Tôi muốn đi du lịch",
-            "image_description": None,
+            "img_desc": None,
             "tags": tags,
         },
         "locations": [
@@ -58,7 +58,7 @@ class TestN5ActivityGenerator(unittest.TestCase):
     def test_budget_constraints(self):
         """Khi không có constraints, N5 áp dụng defaults và vẫn sinh được kết quả."""
         data = {
-            "user": {"text": None, "image_description": None, "tags": ["nature"]},
+            "user": {"text": None, "img_desc": None, "tags": ["nature"]},
             "locations": [{
                 "location_id": "loc_x",
                 "metadata": {"name": "Sa Pa", "description": "", "tags": ["mountain"]},
@@ -132,7 +132,7 @@ class TestN5HybridGenerator(unittest.TestCase):
         self.data = {
             "user": {
                 "text": "Tôi muốn đi núi",
-                "image_description": None,
+                "img_desc": None,
                 "tags": ["nature", "adventure"],
             },
             "locations": [

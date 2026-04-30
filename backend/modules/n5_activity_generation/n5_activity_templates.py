@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 # ĐƯỜNG DẪN TỚI FILE JSON CHÍNH (tạo bởi LLM / script generate)
 # ===========================================================================
 _CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-_DATA_DIR = os.path.join(_CURRENT_DIR, "..", "..", "data")
+_DATA_DIR = os.path.join(_CURRENT_DIR, "data")
 _ACTIVITIES_JSON_PATH = os.path.join(_DATA_DIR, "activities.json")
 
 

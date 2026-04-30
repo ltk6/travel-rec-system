@@ -82,9 +82,10 @@ logger = logging.getLogger(__name__)
 # CONSTANTS
 # =============================================================================
 
-TARGET_PER_LOCATION = 100   # Mục tiêu số activities mỗi location
-LLM_QUOTA           = 25    # LLM sinh tối đa 25/location
-TEMPLATE_QUOTA      = TARGET_PER_LOCATION - LLM_QUOTA  # 75 từ template
+DEFAULT_TARGET_PER_LOCATION = 20    # Mục tiêu số activities mỗi location mặc định
+LLM_QUOTA           = 0     # LLM tắt để tiết kiệm compute
+TEMPLATE_QUOTA      = DEFAULT_TARGET_PER_LOCATION - LLM_QUOTA  # 20 từ template
+TARGET_PER_LOCATION = TEMPLATE_QUOTA
 
 # Sightseeing priority boost — activity types được ưu tiên
 SIGHTSEEING_PRIORITY_TYPES = {"nature", "relaxation"}
@@ -103,7 +104,7 @@ def generate_activities(data: dict) -> dict:
     {
         "user": {
             "text": str | None,
-            "image_description": str | None,
+            "img_desc": str | None,
             "tags": list[str] | None
         },
         "locations": [
@@ -135,7 +136,7 @@ def generate_activities(data: dict) -> dict:
         ]
     }
     """
-    user, locations, constraints = _parse_input(data)
+    user, locations, constraints, target_count = _parse_input(data)
     all_activities: List[Dict] = []
 
     for loc in locations:
@@ -153,6 +154,7 @@ def generate_activities(data: dict) -> dict:
             profile       = profile,
             user          = user,
             constraints   = constraints,
+            target_count  = target_count,
         )
 
         all_activities.extend(activities)
@@ -168,11 +170,13 @@ def generate_activities(data: dict) -> dict:
 # INPUT PARSING
 # =============================================================================
 
-def _parse_input(data: dict) -> Tuple[Dict, List[Dict], Dict]:
+def _parse_input(data: dict) -> Tuple[Dict, List[Dict], Dict, int]:
     """Validate và extract user, locations, constraints từ input dict."""
     user        = data.get("user", {}) or {}
     locations   = data.get("locations", []) or []
     constraints = data.get("constraints", {}) or {}
+    
+    target_count = data.get("target_count", DEFAULT_TARGET_PER_LOCATION)
 
     # Normalize user tags
     user_tags = user.get("tags") or []
@@ -211,7 +215,7 @@ def _parse_input(data: dict) -> Tuple[Dict, List[Dict], Dict]:
             }
         })
 
-    return user, normalized_locs, constraints
+    return user, normalized_locs, constraints, target_count
 
 
 # =============================================================================
@@ -257,9 +261,10 @@ def _generate_for_location(
     profile:       Dict,
     user:          Dict,
     constraints:   Dict,
+    target_count:  int,
 ) -> List[Dict]:
     """
-    Sinh đủ TARGET_PER_LOCATION (100) activities cho một location.
+    Sinh đủ target_count activities cho một location.
     
     Chiến lược:
       1. LLM (nếu có): sinh LLM_QUOTA=25 activities chất lượng cao
@@ -307,7 +312,7 @@ def _generate_for_location(
             logger.info("LLM generated %d activities for '%s'", len(llm_activities), location_name)
 
     # ─── Step 2: Template expansion ───────────────────────────────────────────
-    template_target = TARGET_PER_LOCATION - len(llm_activities)
+    template_target = target_count - len(llm_activities)
     template_activities = _expand_templates(
         location_id   = location_id,
         location_name = location_name,
@@ -323,8 +328,8 @@ def _generate_for_location(
     combined = _deduplicate(combined)
 
     # ─── Step 4: Nếu vẫn thiếu sau dedup → expand thêm ───────────────────────
-    if len(combined) < TARGET_PER_LOCATION:
-        extra_needed = TARGET_PER_LOCATION - len(combined)
+    if len(combined) < target_count:
+        extra_needed = target_count - len(combined)
         extra = _expand_templates(
             location_id   = location_id,
             location_name = location_name,
@@ -345,11 +350,11 @@ def _generate_for_location(
         location_name = location_name,
         profile       = profile,
         target_ratio  = 0.40,
-        target_total  = TARGET_PER_LOCATION,
+        target_total  = target_count,
     )
 
-    # Trim về đúng 100 — sightseeing đã được đưa lên đầu nên không bị mất
-    return combined[:TARGET_PER_LOCATION]
+    # Trim về đúng target_count — sightseeing đã được đưa lên đầu nên không bị mất
+    return combined[:target_count]
 
 
 # =============================================================================

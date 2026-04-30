@@ -3,21 +3,13 @@
 N5 — ACTIVITY GENERATION MODULE
 ─────────────────────────────────────────────
 
-This module generates structured travel activities based on
-selected locations and user preferences.
-
-PURPOSE:
-- Transform ranked locations into actionable activity suggestions
-- Produce structured, constraint-aware activity plans
-- Prepare downstream input for embedding (N6) and ranking systems
-
 ─────────────────────────────────────────────
-INPUT (ASSUMED)
+INPUT
 ─────────────────────────────────────────────
 {
     "user": {
         "text": str | None,
-        "image_description": str | None,
+        "img_desc": str | None,
         "tags": list[str] | None
     },
 
@@ -101,14 +93,6 @@ OUTPUT
         }
     ]
 }
-
-─────────────────────────────────────────────
-DESIGN NOTES:
-- Activities are derived from locations, not independent entities
-- Must be constraint-aware (budget, duration, group size)
-- Must be structured for downstream embedding (N6)
-- No embedding logic or ranking logic here (generation only)
-─────────────────────────────────────────────
 """
 
 from .n5_activity_generator import generate_activities
