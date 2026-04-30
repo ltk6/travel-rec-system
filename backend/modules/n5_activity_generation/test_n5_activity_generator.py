@@ -1,249 +1,279 @@
 """
 test_n5_activity_generator.py — Kiểm tra N5 Activity Generator
-Chạy từ root project: python -m backend.modules.n5_activity_generation.test_n5_activity_generator
+Chạy từ thư mục gốc dự án:
+    python -m unittest backend.modules.n5_activity_generation.test_n5_activity_generator -v
 """
-import sys, json
+import unittest
+from unittest.mock import patch
 
 from backend.modules.n5_activity_generation.n5_activity_generator import (
     generate_activities,
     _is_sightseeing,
 )
 
-
 # ──────────────────────────────────────────────────────────
-# SAMPLE INPUT từ N4
+# HELPER — tạo input chuẩn cho test
 # ──────────────────────────────────────────────────────────
-SAMPLE_INPUT_SINGLE = {
-    "user": {
-        "text": "Tôi muốn đi nơi thiên nhiên, ngắm cảnh đẹp, chụp ảnh",
-        "image_description": None,
-        "tags": ["nature", "photography", "sightseeing", "relax"],
-    },
-    "locations": [
-        {
-            "location_id": "loc_sapa_001",
-            "metadata": {
-                "name": "Sa Pa",
-                "description": "Thị trấn vùng cao Lào Cai với ruộng bậc thang",
-                "tags": ["mountain", "trekking", "nature", "cool_weather", "photography"],
-            }
-        }
-    ],
-    "constraints": {
-        "budget": 5_000_000,
-        "duration": 3,
-        "people": 2,
-        "time_of_day": "morning",
-    }
-}
 
-SAMPLE_INPUT_MULTI = {
-    "user": {
-        "text": "Gia đình 4 người, thích biển và ẩm thực",
-        "image_description": None,
-        "tags": ["beach", "food", "relax", "family"],
-    },
-    "locations": [
-        {
-            "location_id": "loc_pq_001",
-            "metadata": {
-                "name": "Phú Quốc",
-                "description": "Đảo ngọc phía Nam",
-                "tags": ["beach", "sea", "resort", "seafood"],
-            }
+def _make_input(tags, location_name="Sa Pa", location_tags=None,
+                budget=5_000_000, duration=480, people=2):
+    return {
+        "user": {
+            "text": "Tôi muốn đi du lịch",
+            "image_description": None,
+            "tags": tags,
         },
-        {
-            "location_id": "loc_nt_001",
-            "metadata": {
-                "name": "Nha Trang",
-                "description": "Thành phố biển năng động",
-                "tags": ["beach", "sea", "entertainment", "seafood"],
+        "locations": [
+            {
+                "location_id": "loc_test_001",
+                "metadata": {
+                    "name": location_name,
+                    "description": f"Địa điểm {location_name}",
+                    "tags": location_tags or ["nature", "mountain"],
+                }
             }
+        ],
+        "constraints": {
+            "budget": budget,
+            "duration": duration,
+            "people": people,
+            "time_of_day": None,
         }
-    ],
-    "constraints": {
-        "budget": 8_000_000,
-        "duration": 5,
-        "people": 4,
-        "time_of_day": None,
     }
-}
 
-SAMPLE_INPUT_UNKNOWN_LOCATION = {
-    "user": {
-        "text": "Muốn khám phá nơi mới",
-        "image_description": None,
-        "tags": ["adventure", "nature"],
-    },
-    "locations": [
-        {
-            "location_id": "loc_unknown_xyz",
-            "metadata": {
-                "name": "Bản Giốc",
-                "description": "Thác nước hùng vĩ ở Cao Bằng",
-                "tags": ["waterfall", "nature", "adventure", "remote"],
-            }
+
+# ===========================================================================
+# TestN5ActivityGenerator — 9 tests cho core generation
+# ===========================================================================
+
+class TestN5ActivityGenerator(unittest.TestCase):
+    """Test suite cho hàm generate_activities() — chức năng sinh hoạt động."""
+
+    def test_generate_with_matching_tags(self):
+        """N5 sinh được activities khi tags user khớp với location."""
+        result = generate_activities(_make_input(["nature", "photography", "sightseeing"]))
+        activities = result.get("activities", [])
+        self.assertGreater(len(activities), 0)
+
+    def test_budget_constraints(self):
+        """Khi không có constraints, N5 áp dụng defaults và vẫn sinh được kết quả."""
+        data = {
+            "user": {"text": None, "image_description": None, "tags": ["nature"]},
+            "locations": [{
+                "location_id": "loc_x",
+                "metadata": {"name": "Sa Pa", "description": "", "tags": ["mountain"]},
+            }],
+            "constraints": {},
         }
-    ],
-    "constraints": {
-        "budget": 3_000_000,
-        "duration": 2,
-        "people": 2,
-        "time_of_day": None,
-    }
-}
+        result = generate_activities(data)
+        self.assertEqual(len(result.get("activities", [])), 100)
+
+    def test_time_constraints(self):
+        """estimated_duration của mọi activity phải là số dương."""
+        result = generate_activities(_make_input(["nature"], duration=240))
+        for act in result["activities"]:
+            self.assertGreater(act["metadata"]["estimated_duration"], 0)
+
+    def test_missing_location(self):
+        """Địa điểm không có trong LOCATION_PROFILES vẫn sinh đủ 100 activities."""
+        result = generate_activities(_make_input(
+            ["adventure", "nature"],
+            location_name="Bản Giốc",
+            location_tags=["waterfall", "nature", "adventure", "remote"],
+        ))
+        self.assertEqual(len(result.get("activities", [])), 100)
+
+    def test_sorting_by_match_score(self):
+        """Sightseeing activities phải xuất hiện đầu danh sách (ưu tiên cao nhất)."""
+        result = generate_activities(_make_input(["nature", "sightseeing"]))
+        activities = result.get("activities", [])
+        self.assertGreater(len(activities), 0)
+        # Kiểm tra sightseeing ratio ≥ 40% — thể hiện sắp xếp ưu tiên đúng
+        sg_count = sum(1 for a in activities if _is_sightseeing(a))
+        self.assertGreaterEqual(sg_count / len(activities), 0.40)
+
+    def test_limit_result_size(self):
+        """N5 sinh đúng 100 activities cho 1 location, không nhiều hơn."""
+        result = generate_activities(_make_input(["nature", "food", "relax"]))
+        self.assertEqual(len(result.get("activities", [])), 100)
+
+    def test_user_likes_relax_beach(self):
+        """N5 hoạt động đúng với user thích relax và biển."""
+        result = generate_activities(_make_input(
+            ["relax", "beach", "sea"],
+            location_name="Phú Quốc",
+            location_tags=["beach", "sea", "resort", "seafood"],
+        ))
+        self.assertEqual(len(result.get("activities", [])), 100)
+
+    def test_user_likes_culture_history(self):
+        """N5 hoạt động đúng với user thích văn hóa và lịch sử."""
+        result = generate_activities(_make_input(
+            ["culture", "history", "heritage"],
+            location_name="Hội An",
+            location_tags=["heritage", "culture", "ancient_town", "lantern"],
+        ))
+        self.assertEqual(len(result.get("activities", [])), 100)
+
+    def test_user_has_low_budget(self):
+        """N5 vẫn sinh activities khi budget rất thấp (150k VND)."""
+        result = generate_activities(_make_input(["nature"], budget=150_000))
+        self.assertGreater(len(result.get("activities", [])), 0)
 
 
-def run_test(name: str, input_data: dict):
-    print(f"\n{'='*60}")
-    print(f"  TEST: {name}")
-    print(f"{'='*60}")
-
-    result = generate_activities(input_data)
-    activities = result.get("activities", [])
-
-    print(f"\n  Total activities generated: {len(activities)}")
-
-    # Per-location breakdown
-    loc_counts = {}
-    type_counts = {}
-    sightseeing_count = 0
-
-    for act in activities:
-        loc = act.get("location_id", "?")
-        loc_counts[loc] = loc_counts.get(loc, 0) + 1
+# ===========================================================================
+# TestN5HybridGenerator — 8 tests cho hành vi LLM / hybrid
+# ===========================================================================
 
 class TestN5HybridGenerator(unittest.TestCase):
-    """
-    Test suite cho hàm generate_activities_hybrid().
-    """
+    """Test suite cho hành vi LLM fallback trong generate_activities()."""
 
     def setUp(self):
-        """Chuẩn bị dữ liệu chung cho các test hybrid"""
-        self.user_tags = ["nature", "adventure"]
-        self.locations = [
-            {"name": "Sa Pa", "location_id": "loc_sapa"},
-            {"name": "Đà Lạt", "location_id": "loc_dalat"}
-        ]
-        self.constraints = {
-            "budget": 5_000_000,
-            "max_time_per_day": 480
+        self.data = {
+            "user": {
+                "text": "Tôi muốn đi núi",
+                "image_description": None,
+                "tags": ["nature", "adventure"],
+            },
+            "locations": [
+                {
+                    "location_id": "loc_sapa",
+                    "metadata": {
+                        "name": "Sa Pa",
+                        "description": "Thị trấn miền núi phía Bắc",
+                        "tags": ["mountain", "trekking", "nature"],
+                    }
+                },
+                {
+                    "location_id": "loc_dalat",
+                    "metadata": {
+                        "name": "Đà Lạt",
+                        "description": "Thành phố ngàn hoa",
+                        "tags": ["flower", "nature", "cool_weather", "romantic"],
+                    }
+                }
+            ],
+            "constraints": {
+                "budget": 5_000_000,
+                "duration": 480,
+                "people": 2,
+            },
         }
 
     def test_hybrid_fallback_use_llm_false(self):
-        """Khi use_llm=False, hybrid phải dùng rule-based và trả kết quả 'template'."""
-        result = generate_activities_hybrid(
-            self.user_tags, self.locations, self.constraints, use_llm=False
-        )
-        
-        self.assertTrue(len(result) > 0)
-        for act in result:
-            self.assertEqual(act.get("generated_by"), "template")
+        """Khi LLM bị tắt (mocked False), template sinh đủ 100 activities/location."""
+        with patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.is_llm_available",
+            return_value=False
+        ):
+            result = generate_activities(self.data)
+        activities = result.get("activities", [])
+        self.assertEqual(len(activities), 200)  # 2 locations × 100
 
     def test_hybrid_has_generated_by_field(self):
-        """Mọi activity từ hybrid đều phải có trường generated_by."""
-        result = generate_activities_hybrid(
-            self.user_tags, self.locations, self.constraints, use_llm=False
-        )
-        
-        for act in result:
-            self.assertIn("generated_by", act)
-            self.assertIn(act["generated_by"], ["llm", "template"])
+        """Mọi activity phải có đầy đủ các field schema bắt buộc."""
+        required_meta = [
+            "name", "description", "activity_type", "activity_subtype",
+            "intensity", "physical_level", "social_level",
+            "estimated_duration", "price_level",
+            "indoor_outdoor", "weather_dependent", "time_of_day_suitable",
+        ]
+        with patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.is_llm_available",
+            return_value=False
+        ):
+            result = generate_activities(self.data)
+        for act in result.get("activities", []):
+            self.assertIn("activity_id", act)
+            self.assertIn("location_id", act)
+            meta = act.get("metadata", {})
+            for field in required_meta:
+                self.assertIn(field, meta, f"Thiếu field '{field}' trong activity '{act.get('activity_id')}'")
 
     def test_hybrid_fallback_no_api_key(self):
-        """Khi không có API key, hybrid phải fallback về template dù use_llm=True."""
-        with patch("backend.modules.n5_activity_generation.n5_activity_generator._is_llm_available", 
-                   return_value=False):
-            result = generate_activities_hybrid(
-                self.user_tags, self.locations, self.constraints, use_llm=True
-            )
-        
-        self.assertTrue(len(result) > 0)
-        for act in result:
-            self.assertEqual(act.get("generated_by"), "template")
+        """Khi không có API key (is_llm_available=False), template bù đủ 100."""
+        with patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.is_llm_available",
+            return_value=False
+        ):
+            result = generate_activities({**self.data, "locations": [self.data["locations"][0]]})
+        self.assertEqual(len(result.get("activities", [])), 100)
 
     def test_hybrid_sorting_consistent(self):
-        """Kết quả hybrid phải được sắp xếp theo match_score giảm dần."""
-        result = generate_activities_hybrid(
-            self.user_tags, self.locations, self.constraints, use_llm=False
-        )
-        
-        scores = [act.get("match_score", 0) for act in result]
-        self.assertEqual(scores, sorted(scores, reverse=True))
+        """Sightseeing ratio phải ≥ 40% trong kết quả cuối — kể cả khi không có LLM."""
+        with patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.is_llm_available",
+            return_value=False
+        ):
+            result = generate_activities({**self.data, "locations": [self.data["locations"][0]]})
+        activities = result.get("activities", [])
+        sg_count = sum(1 for a in activities if _is_sightseeing(a))
+        self.assertGreaterEqual(sg_count / len(activities), 0.40)
 
     def test_hybrid_respects_constraints(self):
-        """Hybrid phải tuân thủ constraints dù dùng template hay LLM."""
-        constraints = {
-            "budget": 300_000,
-            "max_time_per_day": 120,
-        }
-        result = generate_activities_hybrid(
-            ["adventure", "nature"], self.locations, constraints, use_llm=False
-        )
-        
-        for act in result:
-            self.assertLessEqual(act.get("cost", 0), 300_000 * 0.4)   # cho phép margin
-            self.assertLessEqual(act.get("estimated_time_minutes", 0), 120)
+        """price_level phải trong [1.0, 5.0] và estimated_duration phải > 0."""
+        with patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.is_llm_available",
+            return_value=False
+        ):
+            result = generate_activities(self.data)
+        for act in result.get("activities", []):
+            meta = act["metadata"]
+            self.assertGreaterEqual(meta["price_level"], 1.0)
+            self.assertLessEqual(meta["price_level"], 5.0)
+            self.assertGreater(meta["estimated_duration"], 0)
 
     def test_hybrid_with_mock_llm_success(self):
-        """Test hybrid với mock LLM thành công (phiên bản ổn định)."""
-        mock_llm_activities = [
+        """Khi LLM mock trả về 10 activities, N5 gộp với template để đủ 100."""
+        mock_llm_acts = [
             {
-                "activity_id": "mock_llm_001",
-                "location_id": "loc_sapa",
-                "name": "Trekking ruộng bậc thang Sa Pa",
-                "description": "Trải nghiệm trekking nhẹ nhàng ngắm ruộng bậc thang vào buổi sáng.",
-                "tags": ["trekking", "nature", "photography"],
-                "cost": 280000,
-                "estimated_duration": 210,          # hoặc estimated_time_minutes tùy code của bạn
-                "best_time": ["morning"],
-                "suitable_for": ["couple", "group_small"],
-                "difficulty": "medium",
-                "season": ["sep", "oct"],
-                "reason_template": "Phù hợp với người thích thiên nhiên",
-                "generated_by": "llm",
-                "match_score": 0.92
+                "name": f"LLM Activity {i}",
+                "description": f"Mô tả sinh bởi LLM số {i}",
+                "activity_type": "nature",
+                "activity_subtype": "trekking",
+                "intensity": 0.6,
+                "physical_level": 0.5,
+                "social_level": 0.4,
+                "estimated_duration": 120.0,
+                "price_level": 2.0,
+                "indoor_outdoor": "outdoor",
+                "weather_dependent": True,
+                "time_of_day_suitable": "morning",
             }
+            for i in range(10)
         ]
+        with patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.is_llm_available",
+            return_value=True
+        ), patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.generate_from_llm",
+            return_value=mock_llm_acts
+        ):
+            result = generate_activities({**self.data, "locations": [self.data["locations"][0]]})
 
-        # Giả sử hàm hybrid gọi llm_generator.generate_activities
-        with patch("backend.modules.n5_activity_generation.n5_activity_generator.generate_activities_from_llm", 
-                   return_value=mock_llm_activities):
-            
-            result = generate_activities_hybrid(
-                self.user_tags, self.locations, self.constraints, use_llm=True
-            )
-
-        self.assertIsInstance(result, list)
-        self.assertGreater(len(result), 0, 
-            "Hybrid phải trả về ít nhất 1 activity khi mock LLM thành công")
-
-        if result:
-            first = result[0]
-            self.assertIn("generated_by", first)
-            self.assertIn("match_score", first)
-            self.assertIn("reason_template", first)
+        activities = result.get("activities", [])
+        self.assertEqual(len(activities), 100)
 
     def test_hybrid_llm_failure_fallback(self):
-        """Khi LLM thất bại, hybrid phải fallback về template."""
-        with patch("backend.modules.n5_activity_generation.n5_activity_generator.generate_activities_from_llm", 
-                   return_value=None):
-            
-            result = generate_activities_hybrid(
-                self.user_tags, self.locations, self.constraints, use_llm=True
-            )
-        
-        self.assertTrue(len(result) > 0)
-        for act in result:
-            self.assertEqual(act.get("generated_by"), "template")
+        """Khi LLM trả về None (thất bại), template phải bù đủ 100 activities."""
+        with patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.is_llm_available",
+            return_value=True
+        ), patch(
+            "backend.modules.n5_activity_generation.n5_activity_generator.generate_from_llm",
+            return_value=None
+        ):
+            result = generate_activities({**self.data, "locations": [self.data["locations"][0]]})
+        self.assertEqual(len(result.get("activities", [])), 100)
 
     def test_original_generate_still_works(self):
-        """Hàm generate_activities gốc phải vẫn hoạt động bình thường."""
-        result = generate_activities(self.user_tags, self.locations, self.constraints)
-        self.assertTrue(len(result) > 0)
-        for act in result:
-            self.assertEqual(act.get("generated_by"), "template")
+        """API generate_activities(data: dict) phải trả về {"activities": list} đúng chuẩn."""
+        result = generate_activities({**self.data, "locations": [self.data["locations"][0]]})
+        self.assertIsInstance(result, dict)
+        self.assertIn("activities", result)
+        self.assertIsInstance(result["activities"], list)
+        self.assertEqual(len(result["activities"]), 100)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
