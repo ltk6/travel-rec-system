@@ -95,8 +95,9 @@ def _load_one_location_from_db():
     if not _DB_MODULE_OK:
         return None
     try:
-        locs = get_all_locations()
-        return locs[0] if locs else None
+        result = get_all_locations()
+        data = result.get("data", []) if isinstance(result, dict) else result
+        return data[0] if data else None
     except Exception:
         return None
 
