@@ -1,26 +1,25 @@
 import google.generativeai as genai
 from PIL import Image
 import io
-# Import key từ file cấu hình chung của nhóm
-try:
-    from config.settings import GEMINI_API_KEY
-except ImportError:
-    # Dự phòng nếu file config chưa được push lên
-    GEMINI_API_KEY = "YOUR_FALLBACK_KEY"
+from config.settings import GEMINI_API_KEY
+
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 def process_image(data: dict) -> dict:
     """
     Hàm xử lý ảnh duy nhất (Public API) của Module N2
     Input: {"image": bytes}
-    Output: {"image_description": "..."}
+    Output: {"img_desc": "..."}
     """
     image_bytes = data.get("image")
     if not image_bytes:
-        return {"image_description": "Lỗi: Không tìm thấy dữ liệu hình ảnh."}
+        return {
+            "img_desc": "",
+            "error": "No image provided"
+        }
 
-    # Cấu hình AI
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+
 
     try:
         # Xử lý ảnh
@@ -50,8 +49,24 @@ def process_image(data: dict) -> dict:
         result = model.generate_content([prompt, img])
         
         # Trả về đúng định dạng dict yêu cầu
+        if not result:
+            return {
+                "img_desc": "",
+                "error": "Empty response from model"
+            }
+
+        if not hasattr(result, "text") or not result.text:
+            return {
+                "img_desc": "",
+                "error": "No text returned (possible safety block or invalid image)"
+            }
+
         return {
-            "image_description": result.text.strip()
+            "img_desc": result.text.strip()
         }
+
     except Exception as e:
-        return {"image_description": f"Lỗi xử lý AI: {str(e)}"}
+        return {
+            "img_desc": "",
+            "error": str(e)
+        }

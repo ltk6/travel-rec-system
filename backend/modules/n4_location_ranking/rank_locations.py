@@ -6,17 +6,13 @@ N4 — Location Ranking Module
 Ranks locations by computing weighted cosine similarity between
 user vectors (from N1) and location vectors (from DB/N3).
 
-Weights are computed dynamically from preprocessed user channels:
-    - emotion keyword string length
-    - context keyword string length
-    - tag keyword string length
-    - image keyword string length
+Scoring channels (user → location):
+    text      → text : raw intent match
+    aug_text  → text : expanded semantic match
+    aug_tags  → tag  : tag-based anchor
+    img_desc  → text : visual alignment
 
-Falls back to fixed WEIGHTS when preprocessed_user_input is absent:
-    emotion  (user) vs text (location) : 0.3
-    context  (user) vs text (location) : 0.2
-    tag      (user) vs tag  (location) : 0.4
-    image    (user) vs text (location) : 0.1
+Weights are dynamically set based on sig_k (keyword expansion count).
 """
 
 from __future__ import annotations
@@ -27,15 +23,38 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── Fallback weights (when preprocessed_user_input is absent) ──
-WEIGHTS = {
-    "emotion": 0.3,
-    "context": 0.2,
-    "tag":     0.4,
-    "image":   0.1,
+# ── sig_k-based dynamic weights (see vector-usage-guide.md) ──
+WEIGHT_TABLE = {
+    0: {"text": 0.3, "aug_text": 0.0, "aug_tags": 0.5, "img_desc": 0.2},
+    1: {"text": 0.1, "aug_text": 0.3, "aug_tags": 0.4, "img_desc": 0.2},
+    2: {"text": 0.2, "aug_text": 0.2, "aug_tags": 0.4, "img_desc": 0.2},
+    3: {"text": 0.3, "aug_text": 0.1, "aug_tags": 0.4, "img_desc": 0.2},
 }
 
-# ── Vector helpers ────────────────────────────────────────────
+
+def _get_weights(sig_k: int) -> dict[str, float]:
+    """
+    Dynamic weights:
+    - sig_k <= 3 → base table
+    - sig_k 3→10 → aug_text decays NON-LINEAR from 0.1 → 0
+    """
+    base = WEIGHT_TABLE.get(min(sig_k, 3), WEIGHT_TABLE[0])
+
+    if sig_k <= 3:
+        return base
+
+    start, end = 3, 10
+    t = (sig_k - start) / (end - start)
+    t = max(0.0, min(1.0, t))
+
+    return {
+        "text": base["text"],
+        "aug_text": 0.1 * (1 - t) ** 3,
+        "aug_tags": base["aug_tags"],
+        "img_desc": base["img_desc"],
+    }
+
+# ── Helpers ───────────────────────────────────────────────────
 
 def _dot(a: list[float], b: list[float]) -> float:
     return sum(x * y for x, y in zip(a, b))
@@ -153,39 +172,35 @@ def _constraint_penalty(
 def _score_location(
     user_vectors: dict[str, Any],
     loc_vectors: dict[str, Any],
-    weights: dict[str, float] | None = None,
-    metadata: dict[str, Any] | None = None,
-    constraints: dict[str, Any] | None = None,
+    weights: dict[str, float],
 ) -> tuple[float, str]:
     """
     Compute the weighted similarity score for one location.
 
-    user_vectors keys: emotion, context, image, tag
-    loc_vectors  keys: text, tag
+    user_vectors keys expected  : text, aug_text, aug_tags, img_desc
+    loc_vectors  keys expected  : text, tag
 
     Returns (score: float, reason: str).
     """
-    if weights is None:
-        weights = WEIGHTS
-
-    user_emotion = user_vectors.get("emotion")
-    user_context = user_vectors.get("context")
-    user_image   = user_vectors.get("image")
-    user_tag     = user_vectors.get("tag")
+    u_text     = user_vectors.get("text")
+    u_aug_text = user_vectors.get("aug_text")
+    u_aug_tags = user_vectors.get("aug_tags")
+    u_img_desc = user_vectors.get("img_desc")
 
     loc_text = loc_vectors.get("text")
     loc_tag  = loc_vectors.get("tag")
 
-    sim_emotion = _cosine(user_emotion, loc_text)
-    sim_context = _cosine(user_context, loc_text)
-    sim_image   = _cosine(user_image,   loc_text)
-    sim_tag     = _cosine(user_tag,     loc_tag)
+    # ── similarities ─────────────────────────────
+    sim_text     = _cosine(u_text,     loc_text)
+    sim_aug_text = _cosine(u_aug_text, loc_text)
+    sim_aug_tags = _cosine(u_aug_tags, loc_tag)
+    sim_img_desc = _cosine(u_img_desc, loc_text)
 
     score = (
-        weights["emotion"] * sim_emotion
-        + weights["context"] * sim_context
-        + weights["tag"]     * sim_tag
-        + weights["image"]   * sim_image
+        weights["text"]     * sim_text
+        + weights["aug_text"] * sim_aug_text
+        + weights["aug_tags"] * sim_aug_tags
+        + weights["img_desc"] * sim_img_desc
     )
     score = max(0.0, min(1.0, score))
 
@@ -197,34 +212,15 @@ def _score_location(
 
     # Build reason from signals that are active (weight > 0) and match well (sim >= 0.3)
     parts: list[str] = []
-    if weights["emotion"] > 0 and sim_emotion >= 0.3:
-        parts.append(f"cảm xúc phù hợp ({sim_emotion:.2f})")
-    if weights["context"] > 0 and sim_context >= 0.3:
-        parts.append(f"hoàn cảnh phù hợp ({sim_context:.2f})")
-    if weights["tag"]     > 0 and sim_tag     >= 0.3:
-        parts.append(f"sở thích khớp ({sim_tag:.2f})")
-    if weights["image"]   > 0 and sim_image   >= 0.3:
-        parts.append(f"hình ảnh tương đồng ({sim_image:.2f})")
-
-    if not parts:
-        candidates = {
-            "cảm xúc":   (sim_emotion, weights["emotion"]),
-            "sở thích":  (sim_tag,     weights["tag"]),
-            "hoàn cảnh": (sim_context, weights["context"]),
-            "hình ảnh":  (sim_image,   weights["image"]),
-        }
-        best_label, (best_sim, best_w) = max(
-            candidates.items(), key=lambda kv: kv[1][0] * kv[1][1]
-        )
-        if best_sim > 0 and best_w > 0:
-            reason = f"Gợi ý chung — {best_label} ({best_sim:.2f})"
-        else:
-            reason = "Không đủ thông tin để xếp hạng"
-    else:
-        reason = " · ".join(parts)
-
-    if penalty_notes:
-        reason += " ⚠ " + ", ".join(penalty_notes)
+    if sim_text >= 0.3:
+        parts.append(f"ý định rõ ({sim_text:.2f})")
+    if sim_aug_text >= 0.3:
+        parts.append(f"ngữ cảnh phù hợp ({sim_aug_text:.2f})")
+    if sim_aug_tags >= 0.3:
+        parts.append(f"sở thích khớp ({sim_aug_tags:.2f})")
+    if sim_img_desc >= 0.3:
+        parts.append(f"hình ảnh tương đồng ({sim_img_desc:.2f})")
+    reason = " · ".join(parts) if parts else "Địa điểm phổ biến"
 
     return round(float(score), 4), reason
 
@@ -237,17 +233,12 @@ def rank_locations(data: dict) -> dict:
 
     Input:
     {
-        "preprocessed_user_input": {         # optional — enables dynamic weights
-            "emotion": str | None,
-            "context": str | None,
-            "tag":     str | None,
-            "image":   str | None
-        },
+        "sig_k": int,
         "user_vectors": {
-            "emotion": list[float] | None,
-            "context": list[float] | None,
-            "image":   list[float] | None,
-            "tag":     list[float] | None
+            "text":     list[float] | None,
+            "aug_text": list[float] | None,
+            "aug_tags": list[float] | None,
+            "img_desc": list[float] | None
         },
         "locations": [
             {
@@ -282,11 +273,8 @@ def rank_locations(data: dict) -> dict:
         ]
     }
     """
-    preprocessed_user_input = (
-        data.get("preprocessed_user_input")
-        or data.get("user_processed_input")
-        or {}
-    )
+
+    sig_k        = int(data.get("sig_k", 0))
     user_vectors = data.get("user_vectors", {})
     locations    = data.get("locations", [])
     constraints  = data.get("constraints") or {}
@@ -296,11 +284,8 @@ def rank_locations(data: dict) -> dict:
         logger.warning("[N4] Không có địa điểm nào để xếp hạng")
         return {"locations": []}
 
-    if preprocessed_user_input:
-        weights = _compute_weights(preprocessed_user_input, user_vectors)
-    else:
-        weights = WEIGHTS
-        logger.info("[N4] preprocessed_user_input vắng mặt — dùng trọng số cố định")
+    # ── resolve weights from sig_k ───────────────────────────
+    weights = _get_weights(sig_k)
 
     scored: list[dict] = []
     for loc in locations:
@@ -309,11 +294,7 @@ def rank_locations(data: dict) -> dict:
         metadata    = loc.get("metadata", {})
 
         try:
-            score, reason = _score_location(
-                user_vectors, loc_vectors, weights,
-                metadata=metadata,
-                constraints=constraints,
-            )
+            score, reason = _score_location(user_vectors, loc_vectors, weights)
         except Exception as exc:
             logger.warning("[N4] Lỗi tính điểm cho %s: %s", loc_id, exc)
             score, reason = 0.0, "Lỗi tính điểm"

@@ -1,160 +1,159 @@
+"""
+N7 — Travel Questionnaire UI (Streamlit)
+
+7 questions → 8–14 tags from ALL_TAGS ontology → N8 API
+Follows tagging-guide.md rules:
+  - Each answer maps to 1–2 actual ALL_TAGS keys
+  - Activities get the most tag budget (2–3 tags)
+  - Vibe is the tie-breaker (1–2 tags)
+  - Total user tags: 8–14, never exceed 20
+"""
+
 import streamlit as st
 import requests
 from PIL import Image
 import base64
 
-st.set_page_config(page_title="Travel Questionnaire", page_icon="🧭", layout="centered")
+st.set_page_config(page_title="Travel Planner", page_icon="🧭", layout="centered")
 
-st.title("🧭 Travel Questionnaire")
-st.markdown("10 questions + text + image → structured output for N1")
+st.title("🧭 Travel Planner")
+st.markdown("Answer a few questions and we'll find your perfect destination.")
 
 # ─────────────────────────────
-# QUESTIONS
+# QUESTIONNAIRE
 # ─────────────────────────────
+# Each option value is a list of EXACT ALL_TAGS keys.
+# Budget: 1–2 tags per question, ~8–14 total.
+
 QUESTIONS = [
 
     # ─────────────────────────────
-    # Q1 — SOCIAL
+    # Q1 — TERRAIN / WATER (→ 1–2 tags)
     # ─────────────────────────────
     {
-        "q": "Q1. Who is coming?",
+        "q": "🏔️ What landscape do you prefer?",
         "type": "radio",
-        "options": {
-            "Solo": ["solo", "independent", "flexible", "quiet", "self-paced", "free"],
-            "Couple": ["couple", "romantic", "intimate", "private", "together", "love"],
-            "Family": ["family", "kids", "safe", "stable", "comfortable", "easy"],
-            "Friends": ["group", "social", "lively", "fun", "shared", "active"]
+        "tags": {
+            "Beach & Coast":    ["beach", "island"],
+            "Mountains":        ["mountain"],
+            "Countryside":      ["rice terrace", "valley"],
+            "River & Delta":    ["river", "delta"],
+            "Forest & Nature":  ["forest", "national park"],
+            "City":             ["city"],
         }
     },
 
     # ─────────────────────────────
-    # Q2 — DURATION
+    # Q2 — ACTIVITIES (→ 2–3 tags) ← highest budget
     # ─────────────────────────────
     {
-        "q": "Q2. Duration?",
-        "type": "radio",
-        "options": {
-            "1 day": ["short", "quick", "fast", "near", "simple", "light"],
-            "2–3 days": ["weekend", "balanced", "mid", "flexible", "short-trip", "easy"],
-            "1 week+": ["long", "deep", "slow", "extended", "immersive", "full"]
-        }
-    },
-
-    # ─────────────────────────────
-    # Q3 — DISTANCE
-    # ─────────────────────────────
-    {
-        "q": "Q3. Distance?",
-        "type": "radio",
-        "options": {
-            "Near": ["near", "local", "short-travel", "quick", "easy", "low-effort"],
-            "Domestic": ["domestic", "country", "regional", "accessible", "standard", "varied"],
-            "International": ["intl", "global", "far", "long", "diverse", "new"]
-        }
-    },
-
-    # ─────────────────────────────
-    # Q4 — MOTIVATION
-    # ─────────────────────────────
-    {
-        "q": "Q4. Why travel?",
-        "type": "radio",
-        "options": {
-            "Rest": ["relax", "peace", "calm", "slow", "reset", "quiet"],
-            "Adventure": ["adventure", "explore", "active", "challenge", "movement", "excitement"],
-            "Culture": ["culture", "heritage", "local", "history", "learning", "city"],
-            "Romance": ["romantic", "love", "couple", "intimate", "private", "emotion"]
-        }
-    },
-
-    # ─────────────────────────────
-    # Q5 — ENVIRONMENT (CRITICAL)
-    # ─────────────────────────────
-    {
-        "q": "Q5. Environment?",
-        "type": "radio",
-        "options": {
-            "Beach": ["beach", "sea", "coastal", "sun", "island", "waves"],
-            "Mountain": ["mountain", "highland", "cool", "elevation", "hiking", "nature"],
-            "City": ["city", "urban", "modern", "buildings", "nightlife", "busy"],
-            "Nature": ["nature", "forest", "wild", "green", "fresh", "eco"],
-            "Resort": ["resort", "luxury", "comfort", "spa", "service", "relax"]
-        }
-    },
-
-    # ─────────────────────────────
-    # Q6 — CULTURE LEVEL
-    {
-        "q": "Q6. Culture level?",
-        "type": "radio",
-        "options": {
-            "High": ["culture", "heritage", "history", "local", "deep", "tradition"],
-            "Mid": ["culture-lite", "light", "mixed", "casual", "some", "balanced"],
-            "Low": ["minimal", "none", "nature", "relax", "simple", "non-cultural"]
-        }
-    },
-
-    # ─────────────────────────────
-    # Q7 — CULTURE FOCUS
-    {
-        "q": "Q7. Cultural focus",
+        "q": "🎯 What activities interest you? (pick up to 3)",
         "type": "multi",
-        "options": {
-            "Food": ["food", "eat", "local", "street", "taste", "cuisine"],
-            "Temples": ["temple", "spiritual", "religion", "sacred", "heritage", "calm"],
-            "Markets": ["market", "street", "local", "shopping", "culture", "busy"],
-            "Art": ["art", "museum", "creative", "design", "culture", "visual"]
+        "max": 3,
+        "tags": {
+            "Trekking / Hiking":   ["trekking"],
+            "Snorkeling / Diving": ["snorkeling"],
+            "Kayaking":            ["kayaking"],
+            "Cycling":             ["cycling"],
+            "Motorbiking":         ["motorbiking"],
+            "Camping":             ["camping"],
+            "Boat Cruise":         ["boat cruise"],
+            "Photography":         ["photography"],
+            "Cooking Class":       ["cooking class"],
+            "Spa & Wellness":      ["spa"],
+            "Sightseeing":         ["sightseeing"],
+            "Surfing":             ["surfing"],
         }
     },
 
     # ─────────────────────────────
-    # Q8 — ACTIVITY
+    # Q3 — VIBE / MOOD (→ 1–2 tags) ← tie-breaker
+    # ─────────────────────────────
     {
-        "q": "Q8. Activity level?",
+        "q": "✨ What vibe are you after? (pick up to 2)",
+        "type": "multi",
+        "max": 2,
+        "tags": {
+            "Peaceful & Quiet":     ["peaceful"],
+            "Adventurous & Wild":   ["adventure"],
+            "Romantic & Intimate":  ["romantic"],
+            "Vibrant & Lively":     ["vibrant"],
+            "Off the Beaten Path":  ["off the beaten path"],
+            "Instagrammable":       ["instagrammable"],
+            "Cozy & Warm":          ["cozy"],
+            "Authentic & Local":    ["authentic"],
+        }
+    },
+
+    # ─────────────────────────────
+    # Q4 — COMPANION (→ 1 tag)
+    # ─────────────────────────────
+    {
+        "q": "👥 Who are you traveling with?",
         "type": "radio",
-        "options": {
-            "Active": ["active", "move", "sport", "outdoor", "energy", "adventure"],
-            "Moderate": ["balanced", "mid", "walk", "flexible", "normal", "steady"],
-            "Relaxed": ["relax", "slow", "rest", "calm", "easy", "low-energy"]
+        "tags": {
+            "Solo":             ["solo"],
+            "Couple":           ["couple"],
+            "Family":           ["family"],
+            "Friends":          ["friends trip"],
+            "Group / Team":     ["group"],
         }
     },
 
     # ─────────────────────────────
-    # Q9 — ACTIVITIES
+    # Q5 — DURATION (→ 1 tag)
+    # ─────────────────────────────
     {
-        "q": "Q9. Activities",
-        "type": "multi",
-        "options": {
-            "Hiking": ["hiking", "trek", "mountain", "outdoor", "nature", "climb"],
-            "Swimming": ["swim", "water", "beach", "sea", "cool", "refresh"],
-            "Camping": ["camp", "night", "outdoor", "nature", "sleep", "wild"],
-            "Photo": ["photo", "view", "scenic", "capture", "aesthetic", "frame"]
+        "q": "📅 How long is your trip?",
+        "type": "radio",
+        "tags": {
+            "Day trip":         ["day trip"],
+            "Weekend (2–3 days)": ["weekend trip"],
+            "1 week+":          ["long stay"],
         }
     },
 
     # ─────────────────────────────
-    # Q10 — VIBE
+    # Q6 — BUDGET (→ 1 tag)
+    # ─────────────────────────────
     {
-        "q": "Q10. Vibe",
-        "type": "multi",
-        "options": {
-            "Quiet": ["quiet", "peace", "calm", "silent", "relax", "soft"],
-            "Lively": ["lively", "fun", "energy", "busy", "social", "vibrant"],
-            "Romantic": ["romantic", "love", "couple", "intimate", "warm", "soft"],
-            "Photo": ["photo", "aesthetic", "instagram", "view", "scenic", "visual"]
+        "q": "💰 What's your budget style?",
+        "type": "radio",
+        "tags": {
+            "Budget / Backpacker": ["budget"],
+            "Mid-range":           ["mid range"],
+            "Luxury":              ["luxury"],
+            "Homestay / Eco":      ["homestay"],
         }
-    }
+    },
+
+    # ─────────────────────────────
+    # Q7 — FOOD (→ 0–1 tag)
+    # ─────────────────────────────
+    {
+        "q": "🍜 Any food preferences?",
+        "type": "radio",
+        "tags": {
+            "Street food":      ["street food"],
+            "Seafood":          ["seafood"],
+            "Local cuisine":    ["local cuisine"],
+            "Fine dining":      ["fine dining"],
+            "No preference":    [],
+        }
+    },
 ]
 
+
 # ─────────────────────────────
-# GLOBAL INPUTS
+# FREE TEXT + IMAGE
 # ─────────────────────────────
 
 st.divider()
 
-user_text = st.text_area("✍️ Describe your ideal trip (optional)")
+user_text = st.text_area("✍️ Describe your ideal trip (optional)",
+                         placeholder="E.g. I want a relaxing beach getaway with great seafood...")
 
-uploaded_image = st.file_uploader("🖼 Upload image (optional)", type=["png", "jpg", "jpeg"])
+uploaded_image = st.file_uploader("🖼 Upload inspiration image (optional)", type=["png", "jpg", "jpeg"])
 
 image_b64 = ""
 
@@ -164,43 +163,15 @@ if uploaded_image:
     # getvalue() trả về toàn bộ bytes bất kể vị trí file pointer sau Image.open()
     image_b64 = base64.b64encode(uploaded_image.getvalue()).decode("utf-8")
 
-# ─────────────────────────────
-# CONSTRAINTS
-# ─────────────────────────────
-
-st.divider()
-st.subheader("⚙️ Constraints")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    budget = st.number_input(
-        "Ngân sách (VNĐ)",
-        min_value=0,
-        step=500_000,
-        value=5_000_000,
-        help="Tổng ngân sách cho chuyến đi"
-    )
-with col2:
-    duration = st.number_input(
-        "Thời gian (giờ)",
-        min_value=1,
-        max_value=336,
-        value=48,
-        help="Tổng thời gian chuyến đi tính bằng giờ"
-    )
-with col3:
-    people = st.number_input(
-        "Số người",
-        min_value=1,
-        max_value=50,
-        value=1
-    )
-
-top_k = st.slider("Số địa điểm gợi ý", min_value=1, max_value=20, value=5)
+    # encode image for backend (N2)
+    uploaded_image.seek(0)
+    image_b64 = base64.b64encode(uploaded_image.read()).decode("utf-8")
 
 # ─────────────────────────────
 # QUESTIONS ENGINE
 # ─────────────────────────────
+
+st.divider()
 
 tags = []
 
@@ -208,72 +179,119 @@ for i, item in enumerate(QUESTIONS):
     st.subheader(item["q"])
 
     if item["type"] == "radio":
-        ans = st.radio("", list(item["options"].keys()), key=f"q{i}")
-        tags += item["options"].get(ans, [])
+        ans = st.radio("", list(item["tags"].keys()), key=f"q{i}", label_visibility="collapsed")
+        tags += item["tags"].get(ans, [])
 
     elif item["type"] == "multi":
-        ans = st.multiselect("", list(item["options"].keys()), key=f"q{i}")
+        max_sel = item.get("max", 3)
+        ans = st.multiselect("", list(item["tags"].keys()), key=f"q{i}",
+                             max_selections=max_sel, label_visibility="collapsed")
         for a in ans:
-            tags += item["options"].get(a, [])
+            tags += item["tags"].get(a, [])
 
     st.divider()
 
-# remove duplicates
-tags = list(set(tags))
+# remove duplicates, preserve order
+seen = set()
+tags = [t for t in tags if t not in seen and not seen.add(t)]
+
+# Show tag summary
+st.caption(f"🏷️ Tags selected: {len(tags)} — {', '.join(tags) if tags else 'none'}")
 
 # ─────────────────────────────
 # SUBMIT
 # ─────────────────────────────
 
-if st.button("🚀 Tìm kiếm lộ trình", use_container_width=True):
+if st.button("🚀 Tìm kiếm địa điểm", use_container_width=True):
 
-    payload = {
-        "text":             user_text,
-        "image":            image_b64,
-        "tags":             tags,
-        "constraints": {
-            "budget":   budget   if budget   > 0 else None,
-            "duration": duration if duration > 0 else None,
-            "people":   people   if people   > 0 else None,
-        },
-        "top_k_locations":  top_k,
-    }
+    if not user_text and not tags:
+        st.warning("Please answer at least one question or describe your trip.")
+    else:
+        # N8 API contract: { text, image, tags, constraints, top_k_locations }
+        payload = {
+            "text": user_text,
+            "image": image_b64,
+            "tags": tags,
+            "constraints": {},
+            "top_k_locations": 5,
+        }
 
-    st.write("📦 DEBUG payload (no vectors):", {
-        **payload,
-        "image": f"<base64 {len(image_b64)} chars>" if image_b64 else ""
-    })
+        st.info(f"📝 text: {len(user_text)} chars | 🏷️ tags: {len(tags)} | 🖼️ image: {'yes' if image_b64 else 'no'}")
 
-    try:
-        res = requests.post(
-            "http://localhost:5000/recommend",
-            json=payload,
-            timeout=15
-        )
+        try:
+            res = requests.post(
+                "http://localhost:5000/recommend",
+                json=payload,
+                timeout=30
+            )
 
-        st.write("📡 Status:", res.status_code)
+            if res.status_code == 200:
+                data = res.json()
 
-        if res.status_code == 200:
-            data = res.json()
+                st.success("✅ Tìm thấy kết quả!")
 
-            st.success("✅ Success")
+                # ─── LOCATIONS ───
+                st.subheader("📍 Địa điểm gợi ý")
+                for loc in data.get("locations", []):
+                    meta = loc.get("metadata", {})
+                    name = meta.get("name", loc.get("location_id", "Unknown"))
+                    score = loc.get("score", 0)
+                    reason = loc.get("reason", "")
+                    desc = meta.get("description", "")
 
-            with st.expander("RAW RESPONSE"):
-                st.json(data)
+                    st.markdown(f"### {name}")
+                    st.metric("Score", f"{score:.4f}")
+                    if reason:
+                        st.caption(f"💡 {reason}")
+                    if desc:
+                        st.write(desc)
 
-            st.subheader("📍 Locations")
-            for loc in data.get("locations", []):
-                meta = loc.get("metadata", {})
-                st.markdown(f"### {meta.get('name', loc.get('location_id'))}")
-                st.write(loc.get("score", 0))
-                st.write(meta.get("description", ""))
+                    # Show image if available
+                    img_path = loc.get("image_path", "")
+                    if img_path:
+                        try:
+                            st.image(img_path, caption=name)
+                        except Exception:
+                            pass
 
-            st.subheader("🎯 Activities")
-            for act in data.get("activities", []):
-                st.write(f"- {act.get('activity_id')} ({act.get('score', 0):.3f})")
+                    st.divider()
 
-        else:
-            st.error(res.text)
+                # ─── TRACE (DEBUG) ───
+                with st.expander("🔍 Trace (Debug)"):
+                    trace = data.get("trace", {})
 
-    except Exception as e:
-        st.error(f"Connection failed: {e}")
+                    # User input
+                    st.markdown("**User Input**")
+                    user_trace = trace.get("user", {})
+                    st.json(user_trace.get("input", {}))
+
+                    # N2 image
+                    n2_trace = user_trace.get("n2_image", {})
+                    if n2_trace.get("img_desc"):
+                        st.markdown("**N2 — Image Description**")
+                        st.write(n2_trace["img_desc"])
+
+                    # N1 embedding
+                    n1_trace = user_trace.get("n1_embedding", {})
+                    st.markdown(f"**N1 — sig_k = {n1_trace.get('sig_k', '?')}**")
+
+                    # Vector dims
+                    st.markdown("**Vector Dimensions**")
+                    st.json(user_trace.get("vector_dims", {}))
+
+                    # Ranking
+                    st.markdown("**N4 — Ranking**")
+                    st.json(trace.get("ranking", {}))
+
+                    # Debug
+                    st.markdown("**Debug**")
+                    st.json(trace.get("debug", {}))
+
+                with st.expander("📦 RAW RESPONSE"):
+                    st.json(data)
+
+            else:
+                st.error(res.text)
+
+        except Exception as e:
+            st.error(f"Connection failed: {e}")
