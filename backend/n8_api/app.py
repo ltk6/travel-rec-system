@@ -4,7 +4,7 @@ n8_api/app.py
 N8 – API Orchestrator (Flask)
 
 Pipeline:
-N2 (image → img_desc) → N1 (embed) → N3 (db) → N4 (rank locations)
+N2 (image → img_desc) → N1 (embed) → N3 (db) → N4 (rank locations) → N5 (generate activities) → N6 (rank activities)
 
 Contract summary:
 ─────────────────────────────────────────────
@@ -14,7 +14,7 @@ N2 output: { img_desc: str }
 N1 input:  { text, tags, img_desc }
 N1 output: { sig_k, preprocessed, vectors: { text, aug_text, aug_tags, img_desc } }
 
-N3 output: { status, total, data: [{ location_id, vectors: { text, aug_text, aug_tags, image_description }, metadata, geo }] }
+N3 output: { status, total, data: [{ location_id, vectors: { text, aug_text, aug_tags, img_desc }, metadata, geo }] }
 
 N4 input:  { sig_k, user_vectors: { text, aug_text, aug_tags, img_desc }, locations: [{ location_id, location_vectors: { text, tag } }], top_k }
 N4 output: { locations: [{ location_id, score, reason }] }
@@ -45,6 +45,8 @@ from modules.n1_embedding import embed
 from modules.n2_image_processing import process_image
 from modules.n4_location_ranking import rank_locations
 from modules.n4_location_ranking.rank_locations import _get_weights
+from modules.n5_activity_generation.n5_activity_generator import generate_activities
+from modules.n6_activity_ranking.rank_activities import rank_activities
 
 # ── Logging ───────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -93,7 +95,7 @@ def _safe_vec(v):
 def health():
     return jsonify({
         "status": "ok",
-        "pipeline": ["n1", "n2", "n3", "n4"]
+        "pipeline": ["n1", "n2", "n3", "n4", "n5", "n6"]
     })
 
 
@@ -111,7 +113,9 @@ def recommend():
     image_b64 = body.get("image", "")
     tags = body.get("tags", [])
     constraints = body.get("constraints", {})
+    context_data = body.get("context", {})
     top_k = int(body.get("top_k_locations", 5))
+    top_k_activities = int(body.get("top_k_activities", 5))
 
     if not text and not tags:
         return _err("Provide text or tags")
@@ -128,11 +132,11 @@ def recommend():
 
     # ── N1 — Embed user input ──────────────────
     # N1 contract: { text, tags, img_desc } → { sig_k, preprocessed, vectors }
-    n1_result = embed({
+    n1_result = embed([{
         "text": text,
         "tags": tags,
-        "img_desc": img_desc,
-    })
+        "img_desc": img_desc
+    }])[0]
 
     sig_k = n1_result.get("sig_k", 0)
     vectors = n1_result.get("vectors", {})
@@ -146,14 +150,10 @@ def recommend():
     }
 
     # ── N3 — Fetch locations from DB ───────────
-    # N3 returns { status, total, data: [...] }
     db_result = get_all_locations()
     locations = db_result.get("data", []) if isinstance(db_result, dict) else []
 
     # ── Build N4 input ─────────────────────────
-    # N4 expects location_vectors: { text, tag }
-    # N3 DB stores: text, aug_text, aug_tags, image_description
-    # Mapping: N3.text → N4.text, N3.aug_tags → N4.tag
     n4_locations = []
     loc_map = {}
 
@@ -177,16 +177,14 @@ def recommend():
         }
 
     # ── N4 — Rank locations ────────────────────
-    # N4 contract: { sig_k, user_vectors, locations, top_k }
     n4_result = rank_locations({
         "sig_k": sig_k,
         "user_vectors": user_vectors,
         "locations": n4_locations,
-        "top_k": top_k,
+        "top_k": int(body.get("top_k_locations", 5)),
     })
 
     ranked = n4_result.get("locations", [])
-
     return jsonify({
         # ─────────────────────────────
         # MAIN CONTRACT (DO NOT CHANGE)
@@ -203,7 +201,7 @@ def recommend():
             }
             for r in ranked
         ],
-
+        
         # ─────────────────────────────
         # FULL TRACE (EVERYTHING)
         # ─────────────────────────────
@@ -214,6 +212,7 @@ def recommend():
                     "text": text,
                     "tags": tags,
                     "constraints": constraints,
+                    "context": context_data,
                     "has_image": bool(image_b64),
                 },
                 "n2_image": {
@@ -244,10 +243,9 @@ def recommend():
             "ranking": {
                 "sig_k": sig_k,
                 "weights_used": _get_weights(sig_k),
-                "top_k": top_k,
+                "top_k": int(body.get("top_k_locations", 5)),
                 "ranked": ranked,
             },
-
             # ─── SYSTEM DEBUG ───
             "debug": {
                 "total_locations": len(n4_locations),
@@ -255,11 +253,132 @@ def recommend():
                     "n1": "embedding",
                     "n2": "image_processing",
                     "n3": "database_fetch",
-                    "n4": "ranking",
+                    "n4": "location_ranking"
                 },
             },
         },
     })
+
+# =========================================================================
+# ACTIVITIES ENDPOINT (N5 -> N1 -> N6)
+# =========================================================================
+
+@app.route("/activities", methods=["POST"])
+def get_activities():
+    """
+    Generate and rank activities for a SINGLE location.
+    
+    Expected body:
+    {
+      "text": str,
+      "img_desc": str,
+      "tags": list,
+      "sig_k": int,
+      "user_vectors": dict,
+      "constraints": dict,
+      "context": dict,
+      "location": { "location_id": str, "metadata": dict },
+      "top_k_activities": int
+    }
+    """
+    body = request.get_json() or {}
+    text = body.get("text", "")
+    img_desc = body.get("img_desc", "")
+    tags = body.get("tags", [])
+    sig_k = body.get("sig_k", 0)
+    user_vectors = body.get("user_vectors", {})
+    constraints = body.get("constraints", {})
+    context_data = body.get("context", {})
+    location = body.get("location", {})
+    top_k_activities = int(body.get("top_k_activities", 20))
+
+    if not location:
+        return _err("Missing location data")
+
+    # ── N5 — Generate Activities ───────────────
+    n5_input = {
+        "user": {
+            "text": text,
+            "img_desc": img_desc,
+            "tags": tags
+        },
+        "locations": [location],
+        "constraints": constraints,
+        "target_count": 10
+    }
+    n5_result = generate_activities(n5_input)
+    activities = n5_result.get("activities", [])
+
+    # ── Embed Activities via N1 ────────────────
+    logger.info("Embedding %d activities for location '%s' via N1 (BATCH MODE)...", len(activities), location.get("location_id"))
+    
+    # Prepare batch
+    n1_inputs = []
+    for activity in activities:
+        meta = activity.get("metadata", {})
+        act_name = meta.get("name", "")
+        act_desc = meta.get("description", "")
+        act_text = f"{act_name} - {act_desc}".strip(" -")
+        
+        act_tags = []
+        if meta.get("activity_type"):
+            act_tags.append(meta.get("activity_type"))
+        if meta.get("activity_subtype"):
+            act_tags.append(meta.get("activity_subtype"))
+            
+        n1_inputs.append({
+            "text": act_text,
+            "tags": act_tags,
+            "img_desc": ""
+        })
+        
+    # Execute batch embedding
+    if n1_inputs:
+        n1_batch_results = embed(n1_inputs)
+        
+        # Re-assign vectors to activities
+        for activity, embed_res in zip(activities, n1_batch_results):
+            activity["vectors"] = {
+                "text": _safe_vec(embed_res.get("vectors", {}).get("text")),
+                "tag":  _safe_vec(embed_res.get("vectors", {}).get("aug_tags"))
+            }
+
+    # ── N6 — Rank Activities ───────────────────
+    n6_input = {
+        "sig_k": sig_k,
+        "user_input": {
+            "text": text,
+            "img_desc": img_desc,
+            "tags": tags
+        },
+        "user_vectors": user_vectors,
+        "activities": activities,
+        "constraints": constraints,
+        "context": context_data,
+        "top_k": top_k_activities
+    }
+    n6_result = rank_activities(n6_input)
+    ranked_activities = n6_result.get("activities", [])
+
+    # Enrich ranked activities with metadata from N5
+    act_map = {act.get("activity_id"): act for act in activities}
+    enriched_ranked_activities = []
+    for r_act in ranked_activities:
+        full_act = act_map.get(r_act["activity_id"], {})
+        enriched_ranked_activities.append({
+            "activity_id": r_act["activity_id"],
+            "location_id": r_act["location_id"],
+            "score": r_act["score"],
+            "reason": r_act["reason"],
+            "metadata": full_act.get("metadata", {})
+        })
+
+    return jsonify({
+        "status": "success",
+        "location_id": location.get("location_id"),
+        "activities": enriched_ranked_activities
+    })
+
 
 # ═════════════════════════════════════════════════════════════
 # RUN

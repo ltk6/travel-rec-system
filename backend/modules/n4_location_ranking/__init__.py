@@ -47,13 +47,6 @@ INPUT
             }
         }
     ],
-
-    "constraints": {                         # optional — triggers soft penalty
-        "budget":   float | None,           # VNĐ — so sánh với price_level
-        "duration": float | None,           # giờ — so sánh với estimated_duration
-        "people":   int   | None            # chưa dùng, reserved
-    },
-
     "top_k": int
 }
 
@@ -70,12 +63,6 @@ OUTPUT
     ]
 }
 
-─────────────────────────────────────────────
-CHƯA IMPLEMENT (planned)
-─────────────────────────────────────────────
-- geo proximity scoring (context.user_location lat/lng)
-- constraints.people penalty
-- hard filtering (loại hẳn địa điểm vượt budget)
 """
 
 from .rank_locations import rank_locations

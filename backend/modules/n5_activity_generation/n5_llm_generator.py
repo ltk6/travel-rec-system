@@ -32,8 +32,9 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL   = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+from config.settings import GEMINI_API_KEY
+
+GEMINI_MODEL   = "gemini-2.0-flash"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 LLM_ACTIVITIES_PER_CALL = 25

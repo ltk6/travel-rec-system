@@ -1,22 +1,39 @@
 @echo off
+echo =======================================
+echo     Travel Planner Setup ^& Launcher
+echo =======================================
 
-echo =========================
-echo 0. Installing Requirements
-echo =========================
-:: start "Title" command
-start "Pip Install" cmd /k python -m pip install -r requirements.txt
+:: 1. Setup Virtual Environment
+if not exist "venv\" (
+    echo [INFO] Creating Virtual Environment...
+    python -m venv venv
+)
 
-echo =========================
-echo 1. Seeding database
-echo =========================
-start "DB Seeding" cmd /k python -m backend.n3_database.seed_with_vectors
+echo [INFO] Activating Virtual Environment...
+call venv\Scripts\activate.bat
 
-echo =========================
-echo 2. Starting backend API
-echo =========================
-start "Backend API" cmd /k python -m backend.n8_api.app
+:: 2. Install Requirements
+echo =======================================
+echo 1. Installing/Verifying Requirements
+echo =======================================
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 
-echo =========================
-echo 3. Starting Streamlit UI
-echo =========================
-start "Streamlit UI" cmd /k streamlit run frontend\n7_ui\app.py
+:: Set python path so backend modules can find each other
+set PYTHONPATH=%cd%
+
+:: 3. Start Services
+echo =======================================
+echo 2. Starting Backend API (Port 5000)
+echo =======================================
+start "Travel Planner - Backend" cmd /k "call venv\Scripts\activate.bat && set PYTHONPATH=%cd% && python -m backend.n8_api.app"
+
+echo =======================================
+echo 3. Starting Streamlit UI (Port 8501)
+echo =======================================
+start "Travel Planner - Frontend" cmd /k "call venv\Scripts\activate.bat && set PYTHONPATH=%cd% && python -m streamlit run frontend\n7_ui\app.py"
+
+echo.
+echo [SUCCESS] Both servers are starting up in separate windows!
+echo You can close this window now.
+pause

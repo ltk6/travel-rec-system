@@ -27,7 +27,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from .emotions import ALL_EMOTIONS
-from .tags import ALL_TAGS
+from backend.shared.tags import ALL_TAGS
 from .context import ALL_CONTEXT
 
 

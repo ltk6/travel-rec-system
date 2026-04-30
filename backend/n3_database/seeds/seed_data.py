@@ -1,4 +1,4 @@
-﻿"""
+"""
 seed_data.py
 ============
 Raw data for 25 locations across Vietnam.
@@ -34,8 +34,6 @@ LOCATIONS = [
                 # Food
                 "local wine",
             ],
-            "price_level": 3_500_000,
-            "estimated_duration": 48,
         },
         "geo": {"lat": 22.30, "lng": 103.77},
     },
@@ -63,8 +61,6 @@ LOCATIONS = [
                 # Vibe
                 "wild", "off the beaten path", "adventure",
             ],
-            "price_level": 3_000_000,
-            "estimated_duration": 72,
         },
         "geo": {"lat": 23.23, "lng": 105.25},
     },
@@ -93,8 +89,6 @@ LOCATIONS = [
                 # Vibe
                 "mysterious", "peaceful", "off the beaten path",
             ],
-            "price_level": 1_000_000,
-            "estimated_duration": 24,
         },
         "geo": {"lat": 21.85, "lng": 106.91},
     },
@@ -127,8 +121,6 @@ LOCATIONS = [
                 # Trip Profile
                 "luxury travel",
             ],
-            "price_level": 5_000_000,
-            "estimated_duration": 48,
         },
         "geo": {"lat": 20.91, "lng": 107.18},
     },
@@ -156,8 +148,6 @@ LOCATIONS = [
                 # Trip Profile
                 "backpacking",
             ],
-            "price_level": 2_000_000,
-            "estimated_duration": 24,
         },
         "geo": {"lat": 22.85, "lng": 106.72},
     },
@@ -187,8 +177,6 @@ LOCATIONS = [
                 # Trip Profile
                 "day trip",
             ],
-            "price_level": 1_800_000,
-            "estimated_duration": 24,
         },
         "geo": {"lat": 20.25, "lng": 105.91},
     },
@@ -220,8 +208,6 @@ LOCATIONS = [
                 # Special Interest
                 "eco travel",
             ],
-            "price_level": 2_500_000,
-            "estimated_duration": 48,
         },
         "geo": {"lat": 17.48, "lng": 106.27},
     },
@@ -251,8 +237,6 @@ LOCATIONS = [
                 # Vibe
                 "nostalgic", "spiritual", "romantic",
             ],
-            "price_level": 1_200_000,
-            "estimated_duration": 36,
         },
         "geo": {"lat": 16.46, "lng": 107.57},
     },
@@ -283,8 +267,6 @@ LOCATIONS = [
                 # Trip Profile
                 "couple",
             ],
-            "price_level": 2_000_000,
-            "estimated_duration": 36,
         },
         "geo": {"lat": 15.88, "lng": 108.33},
     },
@@ -318,8 +300,6 @@ LOCATIONS = [
                 # Trip Profile
                 "family", "group",
             ],
-            "price_level": 4_500_000,
-            "estimated_duration": 12,
         },
         "geo": {"lat": 15.99, "lng": 107.98},
     },
@@ -351,8 +331,6 @@ LOCATIONS = [
                 # Trip Profile
                 "couple", "honeymoon",
             ],
-            "price_level": 1_500_000,
-            "estimated_duration": 36,
         },
         "geo": {"lat": 11.97, "lng": 108.45},
     },
@@ -383,8 +361,6 @@ LOCATIONS = [
                 # Trip Profile
                 "friends trip",
             ],
-            "price_level": 800_000,
-            "estimated_duration": 12,
         },
         "geo": {"lat": 12.04, "lng": 108.42},
     },
@@ -419,8 +395,6 @@ LOCATIONS = [
                 # Trip Profile
                 "family", "resort",
             ],
-            "price_level": 3_000_000,
-            "estimated_duration": 48,
         },
         "geo": {"lat": 12.21, "lng": 109.24},
     },
@@ -451,8 +425,6 @@ LOCATIONS = [
                 # Budget
                 "resort",
             ],
-            "price_level": 2_200_000,
-            "estimated_duration": 36,
         },
         "geo": {"lat": 10.94, "lng": 108.30},
     },
@@ -487,8 +459,6 @@ LOCATIONS = [
                 # Budget
                 "resort",
             ],
-            "price_level": 4_000_000,
-            "estimated_duration": 48,
         },
         "geo": {"lat": 10.06, "lng": 104.03},
     },
@@ -518,8 +488,6 @@ LOCATIONS = [
                 # Special Interest
                 "eco travel", "war tourism",
             ],
-            "price_level": 6_000_000,
-            "estimated_duration": 72,
         },
         "geo": {"lat": 8.68, "lng": 106.60},
     },
@@ -550,8 +518,6 @@ LOCATIONS = [
                 # Vibe
                 "off the beaten path", "authentic", "wild",
             ],
-            "price_level": 2_500_000,
-            "estimated_duration": 36,
         },
         "geo": {"lat": 15.38, "lng": 109.11},
     },
@@ -581,8 +547,6 @@ LOCATIONS = [
                 # Trip Profile
                 "weekend trip", "family", "friends trip",
             ],
-            "price_level": 1_500_000,
-            "estimated_duration": 24,
         },
         "geo": {"lat": 10.34, "lng": 107.08},
     },
@@ -613,8 +577,6 @@ LOCATIONS = [
                 # Trip Profile
                 "day trip",
             ],
-            "price_level": 700_000,
-            "estimated_duration": 12,
         },
         "geo": {"lat": 9.99, "lng": 105.74},
     },
@@ -644,8 +606,6 @@ LOCATIONS = [
                 # Trip Profile
                 "day trip",
             ],
-            "price_level": 500_000,
-            "estimated_duration": 12,
         },
         "geo": {"lat": 10.94, "lng": 108.29},
     },
@@ -676,8 +636,6 @@ LOCATIONS = [
                 # Budget
                 "homestay",
             ],
-            "price_level": 2_000_000,
-            "estimated_duration": 48,
         },
         "geo": {"lat": 21.84, "lng": 104.08},
     },
@@ -708,8 +666,6 @@ LOCATIONS = [
                 # Budget
                 "budget",
             ],
-            "price_level": 2_500_000,
-            "estimated_duration": 48,
         },
         "geo": {"lat": 10.51, "lng": 108.93},
     },
@@ -741,8 +697,6 @@ LOCATIONS = [
                 # Special Interest
                 "wellness tourism",
             ],
-            "price_level": 1_800_000,
-            "estimated_duration": 36,
         },
         "geo": {"lat": 14.60, "lng": 108.28},
     },
@@ -775,8 +729,6 @@ LOCATIONS = [
                 # Special Interest
                 "eco travel",
             ],
-            "price_level": 1_500_000,
-            "estimated_duration": 12,
         },
         "geo": {"lat": 15.96, "lng": 108.51},
     },
@@ -809,8 +761,6 @@ LOCATIONS = [
                 # Special Interest
                 "religious tourism",
             ],
-            "price_level": 1_000_000,
-            "estimated_duration": 12,
         },
         "geo": {"lat": 11.37, "lng": 106.16},
     },
