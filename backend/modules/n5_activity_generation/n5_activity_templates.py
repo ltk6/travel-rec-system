@@ -1,5 +1,30 @@
 # =============================================================================
 # n5_activity_templates.py
+# Database mẫu các hoạt động du lịch theo địa điểm (PHIÊN BẢN MỞ RỘNG).
+#
+# File này chứa toàn bộ dữ liệu template cho module N5 Activity Generator.
+# Có thể mở rộng thêm địa điểm và hoạt động mới tại đây.
+#
+# SCHEMA MỚI (v2):
+#   Mỗi activity gồm đầy đủ các trường:
+#     - activity_id:        ID duy nhất (str)
+#     - location_id:        ID location (str)
+#     - name:               Tên hoạt động (str)
+#     - description:        Mô tả hấp dẫn 2-4 câu (str)
+#     - tags:               5-7 tags phong phú để hỗ trợ embedding (list[str])
+#     - cost:               Chi phí VNĐ/người (int)
+#     - estimated_duration: Thời gian ước tính (phút) (int)
+#     - best_time:          Thời gian tốt nhất trong ngày (list[str])
+#     - suitable_for:       Đối tượng phù hợp (list[str])
+#     - difficulty:         Mức độ khó (str: easy/medium/hard)
+#     - season:             Tháng phù hợp nhất (list[str])
+#     - reason_template:    Template ngắn giải thích cá nhân hóa (str)
+#
+# CÁC TRƯỜNG CŨ TƯƠNG THÍCH NGƯỢC:
+#   - "desc" → alias cho "description" (dùng trong generate_activities gốc)
+#   - "time" → alias cho "estimated_duration"
+#   - "cost" → giữ nguyên
+#   - "tags" → giữ nguyên nhưng mở rộng 5-7 tags
 # =============================================================================
 # Template bank cho N5 Activity Generator.
 #
@@ -16,926 +41,324 @@
 
 from typing import Dict, List, Any
 
+import json
+import os
+import logging
+from typing import Dict, Any, List, Optional
 
-# =============================================================================
-# LOCATION PROFILES
-# Mỗi location có: tags đặc trưng, description, best_season, indoor_ratio
-# indoor_ratio: tỷ lệ hoạt động indoor phù hợp (0.0 = toàn outdoor)
-# =============================================================================
-LOCATION_PROFILES: Dict[str, Dict[str, Any]] = {
+logger = logging.getLogger(__name__)
+
+# ===========================================================================
+# ĐƯỜNG DẪN TỚI FILE JSON CHÍNH (tạo bởi LLM / script generate)
+# ===========================================================================
+_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+_DATA_DIR = os.path.join(_CURRENT_DIR, "..", "..", "data")
+_ACTIVITIES_JSON_PATH = os.path.join(_DATA_DIR, "activities.json")
+
+
+def load_activities_from_json(json_path: str = None) -> List[Dict]:
+    """
+    Đọc danh sách activities từ file JSON.
+    
+    File JSON chứa toàn bộ activities với đầy đủ schema v2.
+    Nếu file không tồn tại → trả về list rỗng và log warning.
+    
+    Returns:
+        List[Dict]: Danh sách activities từ JSON.
+    """
+    path = json_path or _ACTIVITIES_JSON_PATH
+    if not os.path.exists(path):
+        logger.warning(f"Không tìm thấy file activities JSON: {path}")
+        return []
+    
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        if not isinstance(data, list):
+            logger.error(f"File activities JSON không phải là array: {path}")
+            return []
+        
+        logger.info(f"Đã load {len(data)} activities từ {path}")
+        return data
+    except json.JSONDecodeError as e:
+        logger.error(f"Lỗi parse JSON tại {path}: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Lỗi đọc file {path}: {e}")
+        return []
+
+
+def group_activities_by_location(activities: List[Dict]) -> Dict[str, Dict]:
+    """
+    Nhóm activities theo location_id, trả về dict tương thích với ACTIVITY_TEMPLATES cũ.
+    
+    Input: danh sách activities từ JSON (schema v2)
+    Output: dict có dạng:
+    {
+        "Sa Pa": {
+            "name": "Sa Pa",
+            "tags": [...],   # tổng hợp unique tags từ tất cả activities
+            "activities": [
+                {
+                    "name": "...",
+                    "desc": "...",        # alias cho description
+                    "cost": ...,
+                    "time": ...,          # alias cho estimated_duration
+                    "tags": [...],
+                    # + tất cả các trường schema v2 khác
+                }
+            ]
+        }
+    }
+    
+    Đảm bảo backward-compatible với hàm generate_activities gốc.
+    """
+    # Mapping từ location_id → tên hiển thị
+    LOCATION_ID_TO_NAME = {
+        "loc_sapa": "Sa Pa",
+        "loc_dalat": "Đà Lạt",
+        "loc_hoian": "Hội An",
+        "loc_phuquoc": "Phú Quốc",
+        "loc_hagiang": "Hà Giang",
+        "loc_phongnha": "Phong Nha",
+        "loc_hue": "Huế",
+        "loc_danang": "Đà Nẵng",
+        "loc_halong": "Hạ Long",
+        "loc_nhatrang": "Nha Trang",
+    }
+    
+    grouped: Dict[str, Dict] = {}
+    
+    for act in activities:
+        loc_id = act.get("location_id", "")
+        loc_name = LOCATION_ID_TO_NAME.get(loc_id, loc_id.replace("loc_", "").replace("_", " ").title())
+        
+        if loc_name not in grouped:
+            grouped[loc_name] = {
+                "name": loc_name,
+                "tags": [],
+                "activities": [],
+            }
+        
+        # Tạo activity entry tương thích ngược (có cả trường cũ và mới)
+        activity_entry = {
+            # Trường cũ (backward-compatible)
+            "name": act.get("name", ""),
+            "desc": act.get("description", ""),
+            "cost": act.get("cost", 0),
+            "time": act.get("estimated_duration", 60),
+            "tags": act.get("tags", []),
+            
+            # Trường mới (schema v2)
+            "activity_id": act.get("activity_id", ""),
+            "location_id": act.get("location_id", ""),
+            "description": act.get("description", ""),
+            "estimated_duration": act.get("estimated_duration", 60),
+            "best_time": act.get("best_time", []),
+            "suitable_for": act.get("suitable_for", []),
+            "difficulty": act.get("difficulty", "easy"),
+            "season": act.get("season", []),
+            "reason_template": act.get("reason_template", ""),
+        }
+        
+        grouped[loc_name]["activities"].append(activity_entry)
+        
+        # Tổng hợp unique tags cho location
+        for tag in act.get("tags", []):
+            if tag not in grouped[loc_name]["tags"]:
+                grouped[loc_name]["tags"].append(tag)
+    
+    return grouped
+
+
+# ===========================================================================
+# ACTIVITY_TEMPLATES: DICT CHÍNH DÙNG BỞI generate_activities()
+#
+# Ưu tiên: load từ activities.json (schema v2 đầy đủ)
+# Fallback: dùng hardcoded templates bên dưới nếu JSON không tồn tại
+# ===========================================================================
+
+# Hardcoded fallback templates (schema v1 - tương thích ngược)
+_FALLBACK_TEMPLATES: Dict[str, Any] = {
     "Sa Pa": {
-        "tags": ["mountain", "nature", "trekking", "culture", "cool_weather",
-                 "photography", "ethnic_culture", "adventure"],
-        "description": "Thị trấn vùng cao Lào Cai với ruộng bậc thang, đỉnh Fansipan và văn hóa dân tộc H'Mông",
-        "best_season": ["march", "april", "may", "september", "october", "november"],
-        "indoor_ratio": 0.2,
-        "price_range": (50_000, 800_000),
-        "region": "north",
+        "name": "Sa Pa",
+        "tags": ["mountain", "nature", "cool", "trekking", "culture"],
+        "activities": [
+            {"name": "Trekking Fansipan", "desc": "Leo núi Fansipan bằng cáp treo hoặc trek nhẹ", "cost": 800000, "time": 240, "tags": ["adventure", "nature", "trekking", "mountain", "iconic"]},
+            {"name": "Thăm bản Cát Cát", "desc": "Khám phá văn hóa dân tộc và ruộng bậc thang", "cost": 150000, "time": 120, "tags": ["culture", "relax", "ethnic", "village", "photography"]},
+            {"name": "Chụp ảnh ruộng bậc thang", "desc": "Thưởng ngoạn và chụp ảnh tại ruộng bậc thang", "cost": 50000, "time": 90, "tags": ["photography", "nature", "landscape", "scenic"]},
+            {"name": "Ăn đặc sản thắng cố & lợn cắp nách", "desc": "Thử ẩm thực địa phương", "cost": 200000, "time": 60, "tags": ["food", "cuisine", "local_food", "culture"]},
+        ]
     },
     "Phú Quốc": {
-        "tags": ["beach", "sea", "resort", "relax", "snorkeling", "island",
-                 "seafood", "photography", "sunset"],
-        "description": "Đảo ngọc phía Nam với bãi biển xanh trong, hải sản tươi và resort cao cấp",
-        "best_season": ["november", "december", "january", "february", "march", "april"],
-        "indoor_ratio": 0.25,
-        "price_range": (0, 900_000),
-        "region": "south",
+        "name": "Phú Quốc",
+        "tags": ["beach", "sea", "resort", "relax", "island"],
+        "activities": [
+            {"name": "Snorkeling tại Bãi Sao", "desc": "Lặn ngắm san hô", "cost": 400000, "time": 180, "tags": ["adventure", "sea", "snorkeling", "nature"]},
+            {"name": "Thăm vườn tiêu", "desc": "Khám phá nông trại tiêu nổi tiếng", "cost": 100000, "time": 90, "tags": ["nature", "agriculture", "education"]},
+            {"name": "Ngắm hoàng hôn trên biển", "desc": "Thư giãn tại bãi biển", "cost": 50000, "time": 120, "tags": ["relax", "photography", "sunset", "beach"]},
+        ]
     },
     "Đà Lạt": {
-        "tags": ["mountain", "cool_weather", "flower", "nature", "photography",
-                 "coffee", "romance", "relax", "cycling"],
-        "description": "Thành phố ngàn hoa cao nguyên với khí hậu ôn hòa, thung lũng xanh và văn hóa cafe",
-        "best_season": ["december", "january", "february", "march", "november"],
-        "indoor_ratio": 0.35,
-        "price_range": (0, 500_000),
-        "region": "central_highland",
+        "name": "Đà Lạt",
+        "tags": ["mountain", "cool", "flower", "nature", "romantic"],
+        "activities": [
+            {"name": "Tham quan đồi chè Cầu Đất", "desc": "Ngắm cảnh và thử trà", "cost": 150000, "time": 120, "tags": ["nature", "relax", "tea", "photography"]},
+            {"name": "Chèo thuyền trên hồ Xuân Hương", "desc": "Hoạt động thư giãn", "cost": 100000, "time": 60, "tags": ["relax", "lake", "romantic"]},
+            {"name": "Thăm vườn hoa thành phố", "desc": "Chụp ảnh hoa", "cost": 80000, "time": 90, "tags": ["photography", "flower", "nature", "garden"]},
+        ]
     },
     "Hội An": {
-        "tags": ["culture", "history", "photography", "food", "relax",
-                 "ancient_town", "lantern", "beach_nearby", "art"],
-        "description": "Phố cổ di sản UNESCO bên sông Hoài, nổi tiếng với đèn lồng, kiến trúc cổ và ẩm thực",
-        "best_season": ["february", "march", "april", "may", "june"],
-        "indoor_ratio": 0.45,
-        "price_range": (0, 1_000_000),
-        "region": "central",
+        "name": "Hội An",
+        "tags": ["culture", "history", "food", "relax", "photography", "heritage"],
+        "activities": [
+            {"name": "Tham quan phố cổ Hội An", "desc": "Khám phá các ngôi nhà cổ và hội quán", "cost": 120000, "time": 180, "tags": ["culture", "history", "photography", "heritage"]},
+            {"name": "Đi thuyền trên sông Hoài", "desc": "Ngắm phố cổ về đêm và thả đèn hoa đăng", "cost": 150000, "time": 60, "tags": ["relax", "culture", "photography", "romantic"]},
+            {"name": "May áo dài lấy ngay", "desc": "May đo trang phục truyền thống", "cost": 1000000, "time": 120, "tags": ["culture", "shopping", "fashion", "traditional"]},
+            {"name": "Thưởng thức Cao Lầu & Mì Quảng", "desc": "Ăn các món đặc sản Hội An", "cost": 80000, "time": 60, "tags": ["food", "culture", "local_food", "cuisine"]},
+            {"name": "Đạp xe dạo quanh ruộng lúa", "desc": "Đạp xe ra vùng ven ngắm cảnh", "cost": 50000, "time": 120, "tags": ["nature", "relax", "sports", "cycling"]},
+            {"name": "Tham gia lớp học nấu ăn", "desc": "Học làm các món ăn đặc trưng miền Trung", "cost": 500000, "time": 150, "tags": ["food", "culture", "education", "cooking"]},
+            {"name": "Tham quan Rừng Dừa Bảy Mẫu", "desc": "Trải nghiệm ngồi thúng và múa thúng", "cost": 150000, "time": 120, "tags": ["nature", "adventure", "fun", "boat"]},
+            {"name": "Tắm biển Cửa Đại/An Bàng", "desc": "Thư giãn trên bãi biển", "cost": 0, "time": 180, "tags": ["beach", "relax", "swimming"]},
+        ]
     },
     "Hạ Long": {
-        "tags": ["sea", "nature", "cruise", "cave", "photography", "geology",
-                 "kayaking", "island", "seafood"],
-        "description": "Vịnh di sản thế giới UNESCO với hàng nghìn đảo đá vôi, hang động và du thuyền",
-        "best_season": ["april", "may", "june", "september", "october"],
-        "indoor_ratio": 0.15,
-        "price_range": (0, 1_500_000),
-        "region": "north",
+        "name": "Hạ Long",
+        "tags": ["sea", "nature", "cruise", "adventure", "island"],
+        "activities": [
+            {"name": "Tour du thuyền Vịnh Hạ Long", "desc": "Ngắm hòn đảo đá vôi và thưởng thức hải sản", "cost": 800000, "time": 240, "tags": ["sea", "nature", "relax", "cruise", "sightseeing"]},
+            {"name": "Chèo Kayak trên Vịnh", "desc": "Tự do chèo thuyền kayak đến gần hang động", "cost": 200000, "time": 90, "tags": ["adventure", "sea", "sports", "kayak"]},
+            {"name": "Thăm Động Thiên Cung", "desc": "Tham quan hang động tự nhiên với nhũ đá tuyệt đẹp", "cost": 100000, "time": 60, "tags": ["nature", "sightseeing", "cave", "geology"]},
+            {"name": "Vui chơi tại Sun World", "desc": "Chơi các trò mạo hiểm và đi cáp treo", "cost": 450000, "time": 240, "tags": ["fun", "entertainment", "theme_park"]},
+            {"name": "Tắm biển Bãi Cháy", "desc": "Tắm biển và thưởng ngoạn hoàng hôn", "cost": 0, "time": 120, "tags": ["beach", "relax", "swimming"]},
+        ]
     },
     "Hà Giang": {
-        "tags": ["mountain", "nature", "adventure", "motorbiking", "culture",
-                 "ethnic_culture", "photography", "trekking", "remote"],
-        "description": "Cao nguyên đá địa đầu tổ quốc với đèo Mã Pí Lèng, sông Nho Quế và văn hóa dân tộc",
-        "best_season": ["march", "april", "september", "october", "november"],
-        "indoor_ratio": 0.1,
-        "price_range": (0, 500_000),
-        "region": "north",
+        "name": "Hà Giang",
+        "tags": ["mountain", "nature", "adventure", "culture", "motorbiking"],
+        "activities": [
+            {"name": "Lái xe máy đèo Mã Pí Lèng", "desc": "Trải nghiệm cung đường đèo hùng vĩ nhất Việt Nam", "cost": 250000, "time": 180, "tags": ["adventure", "motorbiking", "nature", "scenic"]},
+            {"name": "Đi thuyền trên sông Nho Quế", "desc": "Ngắm vực Tu Sản dưới chân đèo Mã Pí Lèng", "cost": 120000, "time": 120, "tags": ["nature", "relax", "photography", "canyon"]},
+            {"name": "Tham quan Dinh Vua Mèo", "desc": "Tìm hiểu gia tộc họ Vương và lịch sử vùng cao", "cost": 30000, "time": 60, "tags": ["culture", "history", "architecture"]},
+            {"name": "Check-in Cột cờ Lũng Cú", "desc": "Chinh phục điểm cực Bắc Tổ quốc", "cost": 40000, "time": 90, "tags": ["sightseeing", "history", "patriotic", "hiking"]},
+            {"name": "Chơi chợ phiên Đồng Văn", "desc": "Tham quan và thưởng thức thắng cố, rượu ngô", "cost": 100000, "time": 120, "tags": ["culture", "food", "market", "ethnic"]},
+            {"name": "Ngắm lúa chín Hoàng Su Phì", "desc": "Chụp ảnh tại ruộng bậc thang ngút ngàn", "cost": 50000, "time": 150, "tags": ["nature", "photography", "rice_terrace", "scenic"]},
+        ]
     },
     "Nha Trang": {
-        "tags": ["beach", "sea", "entertainment", "relax", "diving",
-                 "seafood", "water_sports", "island", "resort"],
-        "description": "Thành phố biển năng động với bãi tắm dài, công viên nước và hải sản phong phú",
-        "best_season": ["january", "february", "march", "april", "july", "august"],
-        "indoor_ratio": 0.3,
-        "price_range": (0, 900_000),
-        "region": "central",
+        "name": "Nha Trang",
+        "tags": ["beach", "sea", "entertainment", "relax", "diving"],
+        "activities": [
+            {"name": "Chơi VinWonders", "desc": "Khu vui chơi giải trí trên đảo Hòn Tre", "cost": 800000, "time": 360, "tags": ["fun", "entertainment", "family", "theme_park"]},
+            {"name": "Tour 3 đảo", "desc": "Tham quan Hòn Mun, Hòn Tằm, trải nghiệm lặn biển", "cost": 500000, "time": 420, "tags": ["sea", "adventure", "nature", "island"]},
+            {"name": "Tắm bùn khoáng tháp Bà", "desc": "Thư giãn với bùn khoáng nóng", "cost": 250000, "time": 120, "tags": ["relax", "health", "spa", "wellness"]},
+            {"name": "Tham quan Tháp Bà Ponagar", "desc": "Khám phá kiến trúc đền tháp Chăm cổ", "cost": 30000, "time": 60, "tags": ["culture", "history", "architecture", "temple"]},
+            {"name": "Thưởng thức hải sản bãi biển", "desc": "Ăn tôm hùm, nhum biển với giá hợp lý", "cost": 500000, "time": 90, "tags": ["food", "seafood", "local_food"]},
+        ]
     },
     "Huế": {
-        "tags": ["culture", "history", "architecture", "food", "relax",
-                 "royal", "river", "pagoda", "photography"],
-        "description": "Cố đô triều Nguyễn bên sông Hương với hoàng cung, lăng tẩm và ẩm thực cung đình",
-        "best_season": ["february", "march", "april", "july", "august"],
-        "indoor_ratio": 0.4,
-        "price_range": (0, 350_000),
-        "region": "central",
-    },
-    "Mù Cang Chải": {
-        "tags": ["mountain", "nature", "photography", "trekking", "ethnic_culture",
-                 "rice_terraces", "adventure", "remote"],
-        "description": "Thung lũng vùng Tây Bắc nổi tiếng với ruộng bậc thang mùa vàng đẹp nhất Việt Nam",
-        "best_season": ["september", "october"],
-        "indoor_ratio": 0.05,
-        "price_range": (0, 400_000),
-        "region": "north",
-    },
-    "Phong Nha": {
-        "tags": ["cave", "nature", "adventure", "trekking", "river",
-                 "photography", "geology", "jungle"],
-        "description": "Vườn quốc gia Phong Nha-Kẻ Bàng với hang động lớn nhất thế giới và rừng nguyên sinh",
-        "best_season": ["february", "march", "april", "may", "june", "july", "august"],
-        "indoor_ratio": 0.2,
-        "price_range": (0, 1_000_000),
-        "region": "central",
-    },
-    "Đà Nẵng": {
-        "tags": ["beach", "sea", "urban", "entertainment", "food",
-                 "nightlife", "bridge", "resort", "photography"],
-        "description": "Thành phố đáng sống nhất Việt Nam với bãi biển Mỹ Khê, cầu Rồng và phố ẩm thực",
-        "best_season": ["march", "april", "may", "june", "july", "august"],
-        "indoor_ratio": 0.35,
-        "price_range": (0, 700_000),
-        "region": "central",
-    },
-    "Hà Nội": {
-        "tags": ["culture", "history", "food", "urban", "photography",
-                 "architecture", "lake", "street_food", "art"],
-        "description": "Thủ đô ngàn năm văn hiến với Hồ Hoàn Kiếm, phố cổ 36 phố phường và ẩm thực đường phố",
-        "best_season": ["october", "november", "december", "march", "april"],
-        "indoor_ratio": 0.5,
-        "price_range": (0, 500_000),
-        "region": "north",
-    },
-    "TP.HCM": {
-        "tags": ["urban", "food", "entertainment", "history", "shopping",
-                 "nightlife", "culture", "museum", "street_food"],
-        "description": "Thành phố năng động nhất Việt Nam với ẩm thực đa dạng, bảo tàng lịch sử và cuộc sống sôi động",
-        "best_season": ["november", "december", "january", "february", "march"],
-        "indoor_ratio": 0.6,
-        "price_range": (0, 600_000),
-        "region": "south",
+        "name": "Huế",
+        "tags": ["culture", "history", "food", "architecture", "relax", "heritage"],
+        "activities": [
+            {"name": "Tham quan Đại Nội Huế", "desc": "Khám phá hoàng cung của vua triều Nguyễn", "cost": 200000, "time": 180, "tags": ["history", "culture", "architecture", "heritage"]},
+            {"name": "Thăm Lăng tẩm các vua Nguyễn", "desc": "Tham quan lăng Khải Định, Minh Mạng, Tự Đức", "cost": 150000, "time": 180, "tags": ["history", "culture", "architecture", "royal"]},
+            {"name": "Nghe Nhã nhạc cung đình Huế", "desc": "Đi thuyền rồng trên sông Hương và thưởng thức nhã nhạc", "cost": 100000, "time": 90, "tags": ["culture", "music", "relax", "heritage"]},
+            {"name": "Thưởng thức bún bò Huế & các loại bánh", "desc": "Ăn uống tại quán địa phương", "cost": 80000, "time": 60, "tags": ["food", "culture", "local_food", "cuisine"]},
+            {"name": "Tham quan chùa Thiên Mụ", "desc": "Vãn cảnh ngôi chùa cổ kính bên sông Hương", "cost": 0, "time": 60, "tags": ["culture", "history", "sightseeing", "temple"]},
+            {"name": "Đạp xe tham quan làng Thủy Biều", "desc": "Trải nghiệm làm thanh trà, nấu ăn và massage chân", "cost": 300000, "time": 180, "tags": ["nature", "culture", "relax", "cycling"]},
+        ]
     },
 }
 
 
-# =============================================================================
-# ACTIVITY TYPE BANK
-# Cấu trúc: {activity_type: [list of activity templates]}
-#
-# Mỗi template có:
-#   name_template: str với {location} placeholder
-#   description_template: str với {location}, {subtype_detail} placeholder
-#   activity_type: str
-#   activity_subtype: str
-#   intensity_range: (min, max) → generator random trong khoảng
-#   physical_level_range: (min, max)
-#   social_level_range: (min, max)
-#   duration_range: (min, max) phút
-#   price_level_range: (min, max) 1.0-5.0 normalized
-#   indoor_outdoor: "indoor" | "outdoor" | "mixed"
-#   weather_dependent: bool
-#   time_of_day_suitable: str
-#   compatible_location_tags: list[str] — chỉ dùng template này nếu location có ít nhất 1 tag này
-#   sightseeing_priority: float 0-1 — mức độ ưu tiên cho ngắm cảnh (cao = ưu tiên cao)
-# =============================================================================
-
-ACTIVITY_TYPE_BANK: Dict[str, List[Dict[str, Any]]] = {
-
-    # ─────────────────────────────────────────
-    # NATURE — Thiên nhiên & Ngắm cảnh (PRIORITY CAO)
-    # ─────────────────────────────────────────
-    "nature": [
-        {
-            "name_template": "Ngắm bình minh tại {location}",
-            "description_template": "Dậy sớm chinh phục điểm cao nhất để đón ánh bình minh tuyệt đẹp trên {location}. Khoảnh khắc bầu trời chuyển màu từ tím sang hồng cam là trải nghiệm khó quên.",
-            "activity_type": "nature",
-            "activity_subtype": "sunrise_viewing",
-            "intensity_range": (0.3, 0.5),
-            "physical_level_range": (0.2, 0.5),
-            "social_level_range": (0.2, 0.8),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 1.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["mountain", "nature", "photography", "beach", "sea"],
-            "sightseeing_priority": 1.0,
-        },
-        {
-            "name_template": "Ngắm hoàng hôn tại {location}",
-            "description_template": "Tìm điểm đẹp nhất để thưởng thức hoàng hôn tại {location} khi ánh nắng vàng dần tắt. Đây là thời điểm lý tưởng để chụp ảnh và tận hưởng không gian yên bình.",
-            "activity_type": "nature",
-            "activity_subtype": "sunset_viewing",
-            "intensity_range": (0.1, 0.3),
-            "physical_level_range": (0.1, 0.3),
-            "social_level_range": (0.2, 0.9),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 1.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["mountain", "beach", "sea", "nature", "photography", "lake", "river"],
-            "sightseeing_priority": 1.0,
-        },
-        {
-            "name_template": "Dạo bộ thiên nhiên quanh {location}",
-            "description_template": "Thong thả khám phá cảnh vật tự nhiên quanh {location} theo tốc độ riêng của bạn. Hít thở không khí trong lành và quan sát hệ sinh thái địa phương.",
-            "activity_type": "nature",
-            "activity_subtype": "nature_walk",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.4),
-            "social_level_range": (0.2, 0.7),
-            "duration_range": (60, 180),
-            "price_level_range": (1.0, 1.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["nature", "mountain", "forest", "lake", "river", "jungle"],
-            "sightseeing_priority": 0.9,
-        },
-        {
-            "name_template": "Ngắm cảnh từ điểm cao nhất {location}",
-            "description_template": "Leo lên điểm nhìn cao nhất tại {location} để thưởng ngoạn toàn cảnh panorama. Tầm mắt trải dài hàng chục km mang đến cảm giác tự do và kỳ vĩ.",
-            "activity_type": "nature",
-            "activity_subtype": "panorama_viewpoint",
-            "intensity_range": (0.3, 0.6),
-            "physical_level_range": (0.3, 0.6),
-            "social_level_range": (0.2, 0.8),
-            "duration_range": (60, 150),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["mountain", "nature", "photography", "adventure", "trekking"],
-            "sightseeing_priority": 1.0,
-        },
-        {
-            "name_template": "Quan sát hệ sinh thái rừng tại {location}",
-            "description_template": "Tham gia tour sinh thái để tìm hiểu về thực vật và động vật trong rừng tự nhiên {location}. Hướng dẫn viên địa phương sẽ kể về sự đa dạng sinh học độc đáo.",
-            "activity_type": "nature",
-            "activity_subtype": "eco_tour",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.5),
-            "social_level_range": (0.4, 0.8),
-            "duration_range": (120, 240),
-            "price_level_range": (2.0, 3.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["nature", "jungle", "cave", "forest", "mountain"],
-            "sightseeing_priority": 0.8,
-        },
-        {
-            "name_template": "Tắm suối / thác nước tại {location}",
-            "description_template": "Tìm đến những con suối hoặc thác nước trong lành ẩn giữa thiên nhiên {location}. Nước mát trong veo và âm thanh thiên nhiên tạo nên trải nghiệm thư giãn tuyệt vời.",
-            "activity_type": "nature",
-            "activity_subtype": "waterfall_swimming",
-            "intensity_range": (0.3, 0.5),
-            "physical_level_range": (0.3, 0.6),
-            "social_level_range": (0.4, 0.9),
-            "duration_range": (90, 180),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["mountain", "nature", "adventure", "trekking", "jungle", "river"],
-            "sightseeing_priority": 0.7,
-        },
-        {
-            "name_template": "Chụp ảnh phong cảnh {location}",
-            "description_template": "Dành thời gian tìm kiếm những góc chụp đẹp nhất tại {location}. Từ cảnh núi non hùng vĩ đến từng chi tiết thiên nhiên tinh tế đều trở thành những bức ảnh đáng nhớ.",
-            "activity_type": "nature",
-            "activity_subtype": "landscape_photography",
-            "intensity_range": (0.2, 0.5),
-            "physical_level_range": (0.2, 0.6),
-            "social_level_range": (0.1, 0.6),
-            "duration_range": (90, 240),
-            "price_level_range": (1.0, 1.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["nature", "mountain", "photography", "beach", "sea", "flower", "rice_terraces"],
-            "sightseeing_priority": 1.0,
-        },
-        {
-            "name_template": "Ngắm hoa nở tại {location}",
-            "description_template": "Mùa hoa tại {location} biến khắp nơi thành tấm thảm màu sắc rực rỡ. Đi dạo qua các vườn hoa, thung lũng và đồi núi khi hoa đang ở độ đẹp nhất.",
-            "activity_type": "nature",
-            "activity_subtype": "flower_viewing",
-            "intensity_range": (0.1, 0.3),
-            "physical_level_range": (0.1, 0.3),
-            "social_level_range": (0.3, 0.9),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["flower", "nature", "photography", "cool_weather", "mountain"],
-            "sightseeing_priority": 0.9,
-        },
-        {
-            "name_template": "Picnic giữa thiên nhiên {location}",
-            "description_template": "Chuẩn bị một bữa picnic nhỏ và tìm khoảng xanh tuyệt đẹp tại {location} để ngồi thư giãn. Hòa mình vào thiên nhiên và tận hưởng bữa ăn nhẹ giữa khung cảnh tuyệt vời.",
-            "activity_type": "nature",
-            "activity_subtype": "picnic",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.2),
-            "social_level_range": (0.5, 1.0),
-            "duration_range": (60, 150),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["nature", "mountain", "flower", "relax", "cool_weather"],
-            "sightseeing_priority": 0.6,
-        },
-        {
-            "name_template": "Ngắm sao đêm tại {location}",
-            "description_template": "Xa ánh đèn đô thị, bầu trời đêm tại {location} hiện ra với hàng triệu vì sao. Đây là trải nghiệm thiên văn học tự nhiên tuyệt vời, đặc biệt vào những đêm trăng non.",
-            "activity_type": "nature",
-            "activity_subtype": "stargazing",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.2),
-            "social_level_range": (0.2, 0.7),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 1.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "night",
-            "compatible_location_tags": ["mountain", "nature", "remote", "beach", "cool_weather"],
-            "sightseeing_priority": 0.8,
-        },
-    ],
-
-    # ─────────────────────────────────────────
-    # ADVENTURE — Phiêu lưu & Thể thao
-    # ─────────────────────────────────────────
-    "adventure": [
-        {
-            "name_template": "Trekking khám phá {location}",
-            "description_template": "Theo chân hướng dẫn viên địa phương trên những con đường mòn uốn lượn qua núi rừng {location}. Mỗi bước đi đều mở ra khung cảnh thiên nhiên mới.",
-            "activity_type": "adventure",
-            "activity_subtype": "trekking",
-            "intensity_range": (0.6, 0.9),
-            "physical_level_range": (0.6, 0.9),
-            "social_level_range": (0.4, 0.8),
-            "duration_range": (180, 360),
-            "price_level_range": (1.5, 3.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["trekking", "mountain", "adventure", "nature", "jungle"],
-            "sightseeing_priority": 0.7,
-        },
-        {
-            "name_template": "Đạp xe khám phá vùng ngoại ô {location}",
-            "description_template": "Thuê xe đạp và lăn bánh qua những con đường làng quê, ruộng đồng xanh mướt quanh {location}. Tiết tấu chậm giúp bạn thực sự thấm đượm vẻ đẹp địa phương.",
-            "activity_type": "adventure",
-            "activity_subtype": "cycling",
-            "intensity_range": (0.4, 0.7),
-            "physical_level_range": (0.4, 0.7),
-            "social_level_range": (0.3, 0.7),
-            "duration_range": (120, 240),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["cycling", "nature", "adventure", "mountain", "relax", "culture"],
-            "sightseeing_priority": 0.7,
-        },
-        {
-            "name_template": "Chèo kayak trên {location}",
-            "description_template": "Trải nghiệm chèo thuyền kayak trên mặt nước xanh ngát tại {location}. Tự do khám phá những góc khuất mà tour thuyền thông thường không thể đến được.",
-            "activity_type": "adventure",
-            "activity_subtype": "kayaking",
-            "intensity_range": (0.5, 0.8),
-            "physical_level_range": (0.5, 0.8),
-            "social_level_range": (0.3, 0.7),
-            "duration_range": (90, 180),
-            "price_level_range": (2.0, 3.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["sea", "kayaking", "adventure", "river", "cave", "island"],
-            "sightseeing_priority": 0.6,
-        },
-        {
-            "name_template": "Leo núi chinh phục đỉnh cao tại {location}",
-            "description_template": "Thử thách bản thân với hành trình leo núi tới đỉnh cao nhất khu vực {location}. Phần thưởng là view 360 độ bao quát toàn bộ vùng đất bên dưới.",
-            "activity_type": "adventure",
-            "activity_subtype": "mountain_climbing",
-            "intensity_range": (0.7, 1.0),
-            "physical_level_range": (0.7, 1.0),
-            "social_level_range": (0.4, 0.8),
-            "duration_range": (240, 480),
-            "price_level_range": (2.0, 4.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["mountain", "trekking", "adventure", "nature"],
-            "sightseeing_priority": 0.8,
-        },
-        {
-            "name_template": "Lái xe máy khám phá cung đường {location}",
-            "description_template": "Tự do lái xe máy trên những cung đường đèo núi uốn lượn quanh {location}. Mỗi khúc cua là một góc nhìn mới về thiên nhiên hùng vĩ phía xa.",
-            "activity_type": "adventure",
-            "activity_subtype": "motorbiking",
-            "intensity_range": (0.5, 0.8),
-            "physical_level_range": (0.4, 0.7),
-            "social_level_range": (0.2, 0.6),
-            "duration_range": (180, 360),
-            "price_level_range": (1.5, 2.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["motorbiking", "mountain", "adventure", "nature", "remote"],
-            "sightseeing_priority": 0.7,
-        },
-        {
-            "name_template": "Lặn biển ngắm san hô tại {location}",
-            "description_template": "Đeo mặt nạ lặn xuống thế giới san hô đầy màu sắc tại vùng biển trong xanh của {location}. Cá nhiệt đới và san hô rực rỡ tạo nên bức tranh thiên nhiên ngoạn mục.",
-            "activity_type": "adventure",
-            "activity_subtype": "snorkeling",
-            "intensity_range": (0.4, 0.6),
-            "physical_level_range": (0.4, 0.6),
-            "social_level_range": (0.4, 0.8),
-            "duration_range": (120, 240),
-            "price_level_range": (2.5, 4.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["sea", "snorkeling", "diving", "beach", "island"],
-            "sightseeing_priority": 0.6,
-        },
-        {
-            "name_template": "Thám hiểm hang động tại {location}",
-            "description_template": "Bước vào thế giới kỳ bí của hang động {location} với những nhũ đá hàng triệu năm tuổi. Ánh đèn chiếu lên các khối đá tạo nên những hình dáng kỳ diệu.",
-            "activity_type": "adventure",
-            "activity_subtype": "cave_exploration",
-            "intensity_range": (0.4, 0.7),
-            "physical_level_range": (0.4, 0.7),
-            "social_level_range": (0.4, 0.8),
-            "duration_range": (60, 180),
-            "price_level_range": (1.5, 3.0),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "anytime",
-            "compatible_location_tags": ["cave", "adventure", "geology", "nature", "jungle"],
-            "sightseeing_priority": 0.8,
-        },
-        {
-            "name_template": "Vượt thác leo núi tại {location}",
-            "description_template": "Cùng hướng dẫn viên chinh phục cung đường vượt thác và leo vách đá tại {location}. Thử thách thể chất và tinh thần trong bối cảnh thiên nhiên nguyên sơ.",
-            "activity_type": "adventure",
-            "activity_subtype": "canyoning",
-            "intensity_range": (0.7, 1.0),
-            "physical_level_range": (0.7, 1.0),
-            "social_level_range": (0.5, 0.9),
-            "duration_range": (180, 360),
-            "price_level_range": (3.0, 5.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["adventure", "mountain", "trekking", "river", "jungle"],
-            "sightseeing_priority": 0.5,
-        },
-        {
-            "name_template": "Zip-line trên không trung tại {location}",
-            "description_template": "Bay lượn trên dây cáp qua những tán rừng xanh của {location}. Tốc độ và chiều cao mang lại cảm giác phấn khích tột độ với view thú vị từ trên cao.",
-            "activity_type": "adventure",
-            "activity_subtype": "zipline",
-            "intensity_range": (0.6, 0.9),
-            "physical_level_range": (0.3, 0.6),
-            "social_level_range": (0.5, 0.9),
-            "duration_range": (60, 120),
-            "price_level_range": (2.5, 4.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["adventure", "mountain", "nature", "jungle", "fun"],
-            "sightseeing_priority": 0.5,
-        },
-    ],
-
-    # ─────────────────────────────────────────
-    # RELAXATION — Thư giãn & Nghỉ dưỡng
-    # ─────────────────────────────────────────
-    "relaxation": [
-        {
-            "name_template": "Tắm biển và thư giãn bãi cát {location}",
-            "description_template": "Nằm dài trên bãi cát trắng mịn của {location}, để sóng biển và gió mát cuốn đi mọi mệt mỏi. Đây là kiểu nghỉ ngơi tuyệt vời nhất tại đây.",
-            "activity_type": "relaxation",
-            "activity_subtype": "beach_relaxation",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.2),
-            "social_level_range": (0.2, 0.8),
-            "duration_range": (120, 240),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["beach", "sea", "resort", "relax", "island"],
-            "sightseeing_priority": 0.4,
-        },
-        {
-            "name_template": "Spa và massage thư giãn tại {location}",
-            "description_template": "Trải nghiệm liệu trình massage truyền thống kết hợp thảo dược địa phương tại {location}. Đôi bàn tay lành nghề của các chuyên gia giúp cơ thể và tâm trí hoàn toàn thư giãn.",
-            "activity_type": "relaxation",
-            "activity_subtype": "spa_massage",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.1),
-            "social_level_range": (0.1, 0.4),
-            "duration_range": (60, 120),
-            "price_level_range": (2.0, 4.0),
-            "indoor_outdoor": "indoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["resort", "relax", "beach", "health", "cool_weather"],
-            "sightseeing_priority": 0.1,
-        },
-        {
-            "name_template": "Ngồi cafe ngắm cảnh tại {location}",
-            "description_template": "Tìm một quán cafe có view đẹp tại {location} và dành vài giờ nhấm nháp cà phê, đọc sách hoặc đơn giản là ngắm phong cảnh trôi qua. Đây là cách tốt nhất để cảm nhận nhịp sống địa phương.",
-            "activity_type": "relaxation",
-            "activity_subtype": "cafe_sightseeing",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.1),
-            "social_level_range": (0.2, 0.6),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "anytime",
-            "compatible_location_tags": ["coffee", "relax", "cool_weather", "urban", "romance", "photography"],
-            "sightseeing_priority": 0.5,
-        },
-        {
-            "name_template": "Thiền và yoga buổi sáng tại {location}",
-            "description_template": "Bắt đầu ngày mới với buổi thiền định hoặc yoga trong không gian thiên nhiên trong lành của {location}. Hít thở sâu và tìm lại sự cân bằng nội tâm giữa khung cảnh tuyệt đẹp.",
-            "activity_type": "relaxation",
-            "activity_subtype": "yoga_meditation",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.4),
-            "social_level_range": (0.1, 0.5),
-            "duration_range": (60, 90),
-            "price_level_range": (1.5, 2.5),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["relax", "resort", "nature", "cool_weather", "beach", "mountain"],
-            "sightseeing_priority": 0.2,
-        },
-        {
-            "name_template": "Đi thuyền ngắm cảnh trên {location}",
-            "description_template": "Nhẹ nhàng lướt trên mặt nước, ngắm cảnh {location} từ một góc độ hoàn toàn mới. Tiếng nước vỗ mạn thuyền và cảnh quan hai bên bờ tạo nên trải nghiệm thư giãn tuyệt vời.",
-            "activity_type": "relaxation",
-            "activity_subtype": "boat_sightseeing",
-            "intensity_range": (0.1, 0.3),
-            "physical_level_range": (0.1, 0.2),
-            "social_level_range": (0.3, 0.8),
-            "duration_range": (60, 180),
-            "price_level_range": (1.5, 3.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": True,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["river", "sea", "lake", "cruise", "relax", "photography"],
-            "sightseeing_priority": 0.8,
-        },
-    ],
-
-    # ─────────────────────────────────────────
-    # CULTURE — Văn hóa & Lịch sử
-    # ─────────────────────────────────────────
-    "culture": [
-        {
-            "name_template": "Tham quan di tích lịch sử tại {location}",
-            "description_template": "Khám phá những công trình kiến trúc và di tích lịch sử đặc sắc tại {location}. Hướng dẫn viên sẽ kể lại những câu chuyện lịch sử hào hùng gắn liền với từng địa danh.",
-            "activity_type": "culture",
-            "activity_subtype": "historical_site",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.4),
-            "social_level_range": (0.3, 0.8),
-            "duration_range": (90, 180),
-            "price_level_range": (1.0, 2.5),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["history", "culture", "architecture", "royal", "heritage"],
-            "sightseeing_priority": 0.7,
-        },
-        {
-            "name_template": "Thăm làng nghề truyền thống tại {location}",
-            "description_template": "Ghé thăm các làng nghề thủ công truyền thống xung quanh {location} — nơi các nghệ nhân vẫn gìn giữ kỹ thuật làm đồ thủ công, gốm sứ hoặc dệt lụa qua nhiều thế hệ.",
-            "activity_type": "culture",
-            "activity_subtype": "craft_village",
-            "intensity_range": (0.2, 0.3),
-            "physical_level_range": (0.1, 0.3),
-            "social_level_range": (0.4, 0.8),
-            "duration_range": (90, 150),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["culture", "history", "art", "ethnic_culture", "shopping"],
-            "sightseeing_priority": 0.5,
-        },
-        {
-            "name_template": "Thăm bảo tàng địa phương tại {location}",
-            "description_template": "Khám phá bảo tàng tại {location} để hiểu sâu hơn về lịch sử, văn hóa và đời sống của người dân địa phương qua các thế kỷ. Bộ sưu tập hiện vật quý giá chờ đón bạn.",
-            "activity_type": "culture",
-            "activity_subtype": "museum_visit",
-            "intensity_range": (0.1, 0.3),
-            "physical_level_range": (0.1, 0.2),
-            "social_level_range": (0.2, 0.6),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "indoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "anytime",
-            "compatible_location_tags": ["culture", "history", "art", "urban", "education"],
-            "sightseeing_priority": 0.4,
-        },
-        {
-            "name_template": "Tham quan chùa / đền / thánh thất tại {location}",
-            "description_template": "Thăm viếng những ngôi chùa, đền hoặc thánh thất cổ kính tại {location}. Không gian linh thiêng và kiến trúc độc đáo mang lại sự bình yên và hiểu biết về tín ngưỡng địa phương.",
-            "activity_type": "culture",
-            "activity_subtype": "temple_pagoda",
-            "intensity_range": (0.1, 0.3),
-            "physical_level_range": (0.1, 0.3),
-            "social_level_range": (0.2, 0.6),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 1.5),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["culture", "history", "religion", "architecture", "photography", "pagoda"],
-            "sightseeing_priority": 0.6,
-        },
-        {
-            "name_template": "Tham dự lễ hội truyền thống tại {location}",
-            "description_template": "Hòa mình vào các lễ hội truyền thống đặc sắc tại {location}. Âm nhạc, trang phục, nghi lễ và ẩm thực lễ hội tạo nên trải nghiệm văn hóa sống động, đậm đà bản sắc.",
-            "activity_type": "culture",
-            "activity_subtype": "festival",
-            "intensity_range": (0.3, 0.6),
-            "physical_level_range": (0.2, 0.5),
-            "social_level_range": (0.7, 1.0),
-            "duration_range": (120, 240),
-            "price_level_range": (1.0, 2.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "anytime",
-            "compatible_location_tags": ["culture", "history", "ethnic_culture", "lantern", "music"],
-            "sightseeing_priority": 0.6,
-        },
-        {
-            "name_template": "Thăm bản làng dân tộc thiểu số tại {location}",
-            "description_template": "Đến thăm các bản làng dân tộc thiểu số quanh {location} để tìm hiểu về phong tục, tập quán và lối sống truyền thống. Người dân địa phương sẽ chào đón bạn bằng sự chân thành.",
-            "activity_type": "culture",
-            "activity_subtype": "ethnic_village",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.4),
-            "social_level_range": (0.5, 0.9),
-            "duration_range": (120, 210),
-            "price_level_range": (1.0, 2.5),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["ethnic_culture", "culture", "mountain", "remote", "trekking"],
-            "sightseeing_priority": 0.6,
-        },
-    ],
-
-    # ─────────────────────────────────────────
-    # FOOD — Ẩm thực
-    # ─────────────────────────────────────────
-    "food": [
-        {
-            "name_template": "Ăn sáng đặc sản địa phương tại {location}",
-            "description_template": "Bắt đầu ngày khám phá tại {location} bằng bữa sáng với những món ăn đặc sản địa phương. Hương vị độc đáo và không khí chợ sáng sẽ tạo nên ký ức khó phai.",
-            "activity_type": "food",
-            "activity_subtype": "local_breakfast",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.1),
-            "social_level_range": (0.3, 0.7),
-            "duration_range": (45, 90),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["food", "culture", "street_food", "urban"],
-            "sightseeing_priority": 0.2,
-        },
-        {
-            "name_template": "Tour ẩm thực đường phố {location}",
-            "description_template": "Theo chân hướng dẫn viên ẩm thực đi qua các con phố ẩm thực tại {location}. Thưởng thức từng món ăn đường phố đặc trưng, từ gánh hàng rong đến quán lề đường lâu năm.",
-            "activity_type": "food",
-            "activity_subtype": "street_food_tour",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.4),
-            "social_level_range": (0.5, 0.9),
-            "duration_range": (120, 180),
-            "price_level_range": (2.0, 3.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["food", "street_food", "culture", "urban", "history"],
-            "sightseeing_priority": 0.3,
-        },
-        {
-            "name_template": "Học nấu ăn truyền thống tại {location}",
-            "description_template": "Tham gia lớp học nấu ăn để học cách chế biến những món đặc sản của {location} từ đầu bếp địa phương. Vừa học kỹ năng nấu ăn vừa tìm hiểu câu chuyện đằng sau từng món.",
-            "activity_type": "food",
-            "activity_subtype": "cooking_class",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.3),
-            "social_level_range": (0.6, 1.0),
-            "duration_range": (120, 180),
-            "price_level_range": (3.0, 4.5),
-            "indoor_outdoor": "indoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["food", "culture", "education", "history"],
-            "sightseeing_priority": 0.1,
-        },
-        {
-            "name_template": "Thưởng thức hải sản tươi sống tại {location}",
-            "description_template": "Đến chợ hải sản hoặc nhà hàng bờ biển tại {location} để tự chọn và thưởng thức những con tôm, cua, mực vừa đánh bắt về. Độ tươi ngon không đâu sánh được.",
-            "activity_type": "food",
-            "activity_subtype": "seafood_dining",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.1),
-            "social_level_range": (0.5, 1.0),
-            "duration_range": (90, 150),
-            "price_level_range": (2.5, 4.5),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["seafood", "sea", "beach", "food", "island"],
-            "sightseeing_priority": 0.1,
-        },
-        {
-            "name_template": "Khám phá chợ địa phương tại {location}",
-            "description_template": "Dạo quanh chợ truyền thống tại {location} để quan sát cuộc sống thường nhật của người dân. Thử các loại trái cây, đặc sản và đồ ăn vặt độc đáo chỉ có tại đây.",
-            "activity_type": "food",
-            "activity_subtype": "local_market",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.3),
-            "social_level_range": (0.5, 0.9),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 2.5),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["food", "culture", "shopping", "ethnic_culture", "street_food"],
-            "sightseeing_priority": 0.3,
-        },
-    ],
-
-    # ─────────────────────────────────────────
-    # NIGHTLIFE — Về đêm
-    # ─────────────────────────────────────────
-    "nightlife": [
-        {
-            "name_template": "Dạo phố đêm tại {location}",
-            "description_template": "Khi màn đêm buông xuống, {location} khoác lên mình bộ mặt hoàn toàn khác với ánh đèn lung linh và nhịp sống sôi động. Dạo bộ và cảm nhận không khí đêm độc đáo.",
-            "activity_type": "nightlife",
-            "activity_subtype": "night_walk",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.3),
-            "social_level_range": (0.4, 0.9),
-            "duration_range": (90, 180),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "night",
-            "compatible_location_tags": ["nightlife", "urban", "culture", "entertainment", "ancient_town"],
-            "sightseeing_priority": 0.6,
-        },
-        {
-            "name_template": "Thả đèn hoa đăng trên sông tại {location}",
-            "description_template": "Tham gia nghi lễ thả đèn hoa đăng truyền thống trên sông hoặc biển tại {location}. Hàng trăm ngọn đèn nhỏ trôi theo dòng nước tạo nên cảnh tượng lung linh, huyền ảo.",
-            "activity_type": "nightlife",
-            "activity_subtype": "lantern_release",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.2),
-            "social_level_range": (0.5, 1.0),
-            "duration_range": (60, 120),
-            "price_level_range": (1.0, 2.0),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "night",
-            "compatible_location_tags": ["lantern", "culture", "river", "sea", "romance", "ancient_town"],
-            "sightseeing_priority": 0.8,
-        },
-        {
-            "name_template": "Xem biểu diễn nghệ thuật truyền thống tại {location}",
-            "description_template": "Thưởng thức các tiết mục nghệ thuật truyền thống — múa dân gian, nhạc cụ dân tộc hoặc biểu diễn sân khấu — tại {location}. Nghệ thuật địa phương chứa đựng hồn cốt văn hóa.",
-            "activity_type": "nightlife",
-            "activity_subtype": "cultural_performance",
-            "intensity_range": (0.1, 0.2),
-            "physical_level_range": (0.1, 0.1),
-            "social_level_range": (0.4, 0.9),
-            "duration_range": (90, 150),
-            "price_level_range": (1.5, 3.0),
-            "indoor_outdoor": "indoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "night",
-            "compatible_location_tags": ["culture", "music", "entertainment", "history", "art"],
-            "sightseeing_priority": 0.4,
-        },
-    ],
-
-    # ─────────────────────────────────────────
-    # SHOPPING — Mua sắm
-    # ─────────────────────────────────────────
-    "shopping": [
-        {
-            "name_template": "Mua sắm đặc sản địa phương tại {location}",
-            "description_template": "Tìm mua những sản vật đặc trưng của {location} làm quà tặng hoặc lưu niệm: từ thực phẩm đặc sản, đồ thủ công mỹ nghệ đến vải vóc truyền thống.",
-            "activity_type": "shopping",
-            "activity_subtype": "local_souvenir",
-            "intensity_range": (0.1, 0.3),
-            "physical_level_range": (0.1, 0.3),
-            "social_level_range": (0.4, 0.8),
-            "duration_range": (60, 120),
-            "price_level_range": (1.5, 3.5),
-            "indoor_outdoor": "mixed",
-            "weather_dependent": False,
-            "time_of_day_suitable": "afternoon",
-            "compatible_location_tags": ["shopping", "culture", "food", "ethnic_culture", "art"],
-            "sightseeing_priority": 0.2,
-        },
-        {
-            "name_template": "Tham quan chợ phiên vùng cao tại {location}",
-            "description_template": "Chợ phiên vùng cao tại {location} là nơi người dân các dân tộc thiểu số tụ họp để trao đổi hàng hóa. Sắc màu trang phục và âm thanh sôi động tạo nên không gian độc đáo.",
-            "activity_type": "shopping",
-            "activity_subtype": "highland_market",
-            "intensity_range": (0.2, 0.4),
-            "physical_level_range": (0.2, 0.4),
-            "social_level_range": (0.6, 1.0),
-            "duration_range": (90, 180),
-            "price_level_range": (1.0, 2.5),
-            "indoor_outdoor": "outdoor",
-            "weather_dependent": False,
-            "time_of_day_suitable": "morning",
-            "compatible_location_tags": ["ethnic_culture", "culture", "mountain", "food", "shopping"],
-            "sightseeing_priority": 0.5,
-        },
-    ],
-}
+def _build_activity_templates() -> Dict[str, Any]:
+    """
+    Xây dựng ACTIVITY_TEMPLATES từ nguồn dữ liệu tốt nhất có sẵn.
+    
+    Ưu tiên:
+      1. Load từ activities.json (schema v2, đầy đủ 100+ activities)
+      2. Fallback về _FALLBACK_TEMPLATES nếu JSON không tồn tại
+    
+    Kết quả được cache ở module level (ACTIVITY_TEMPLATES).
+    """
+    json_activities = load_activities_from_json()
+    
+    if json_activities:
+        templates = group_activities_by_location(json_activities)
+        logger.info(
+            f"Loaded {len(json_activities)} activities cho {len(templates)} locations từ JSON"
+        )
+        return templates
+    else:
+        logger.info("Sử dụng fallback templates (hardcoded)")
+        return _FALLBACK_TEMPLATES
 
 
-# =============================================================================
-# SIGHTSEEING BOOST TAGS
-# Các tags được cộng thêm sightseeing_priority khi location có những đặc điểm này
-# Dùng để ưu tiên activities ngắm cảnh theo yêu cầu
-# =============================================================================
-SIGHTSEEING_BOOST_TAGS = {
-    "photography": 0.2,
-    "nature": 0.15,
-    "mountain": 0.15,
-    "sea": 0.1,
-    "beach": 0.1,
-    "rice_terraces": 0.25,
-    "cave": 0.15,
-    "river": 0.1,
-    "lake": 0.1,
-    "flower": 0.15,
-    "sunset": 0.2,
-    "panorama": 0.25,
-    "geology": 0.15,
-}
+# Module-level constant: dùng bởi n5_activity_generator.py
+ACTIVITY_TEMPLATES: Dict[str, Any] = _build_activity_templates()
 
 
-# =============================================================================
-# VARIATION MODIFIERS
-# Dùng để tạo biến thể của cùng một activity template → đạt 100 activities/location
-# Mỗi modifier thay đổi nhẹ: tên, description, thời gian trong ngày, intensity, v.v.
-# =============================================================================
-VARIATION_MODIFIERS = [
-    {
-        "suffix": "buổi sáng sớm",
-        "time_of_day_suitable": "morning",
-        "intensity_delta": -0.05,
-        "desc_prefix": "Khi mặt trời vừa mọc và sương sớm còn phủ mờ, ",
-    },
-    {
-        "suffix": "lúc hoàng hôn",
-        "time_of_day_suitable": "afternoon",
-        "intensity_delta": 0.0,
-        "desc_prefix": "Dưới ánh hoàng hôn vàng rực, ",
-    },
-    {
-        "suffix": "cùng hướng dẫn viên bản địa",
-        "time_of_day_suitable": "morning",
-        "intensity_delta": 0.05,
-        "desc_prefix": "Cùng hướng dẫn viên người bản địa giàu kinh nghiệm, ",
-    },
-    {
-        "suffix": "theo nhóm nhỏ",
-        "time_of_day_suitable": "anytime",
-        "intensity_delta": 0.0,
-        "desc_prefix": "Trong một nhóm nhỏ thân mật, ",
-    },
-    {
-        "suffix": "phiên bản nâng cao",
-        "time_of_day_suitable": "morning",
-        "intensity_delta": 0.15,
-        "desc_prefix": "Với lộ trình nâng cao hơn và thách thức thú vị hơn, ",
-    },
-    {
-        "suffix": "phiên bản dành cho người mới",
-        "time_of_day_suitable": "morning",
-        "intensity_delta": -0.15,
-        "desc_prefix": "Thiết kế đặc biệt cho người mới bắt đầu, ",
-    },
-    {
-        "suffix": "kết hợp chụp ảnh nghệ thuật",
-        "time_of_day_suitable": "morning",
-        "intensity_delta": 0.0,
-        "desc_prefix": "Kết hợp hoàn hảo với niềm đam mê nhiếp ảnh, ",
-    },
-    {
-        "suffix": "trải nghiệm VIP",
-        "time_of_day_suitable": "anytime",
-        "intensity_delta": 0.0,
-        "desc_prefix": "Với dịch vụ riêng tư và không gian độc quyền, ",
-    },
-    {
-        "suffix": "theo phong cách địa phương",
-        "time_of_day_suitable": "morning",
-        "intensity_delta": 0.0,
-        "desc_prefix": "Trải nghiệm theo đúng cách người địa phương vẫn làm từ bao đời, ",
-    },
-    {
-        "suffix": "mùa lễ hội",
-        "time_of_day_suitable": "anytime",
-        "intensity_delta": 0.1,
-        "desc_prefix": "Đúng dịp lễ hội, không khí nơi đây trở nên sôi động hơn bao giờ hết. ",
-    },
-]
+# ===========================================================================
+# TIỆN ÍCH: Lấy danh sách tất cả locations, activities, thống kê
+# ===========================================================================
+
+def get_all_location_names() -> List[str]:
+    """Trả về danh sách tên tất cả locations có trong templates."""
+    return list(ACTIVITY_TEMPLATES.keys())
+
+
+def get_activities_for_location(location_name: str) -> List[Dict]:
+    """Trả về danh sách activities cho một location cụ thể."""
+    template = ACTIVITY_TEMPLATES.get(location_name, {})
+    return template.get("activities", [])
+
+
+def get_total_activity_count() -> int:
+    """Đếm tổng số activities trên tất cả locations."""
+    total = 0
+    for loc_data in ACTIVITY_TEMPLATES.values():
+        total += len(loc_data.get("activities", []))
+    return total
+
+
+def get_stats() -> Dict:
+    """
+    Thống kê tổng quan về database activities.
+    
+    Returns:
+        Dict với các key: total_locations, total_activities, locations_detail
+    """
+    stats = {
+        "total_locations": len(ACTIVITY_TEMPLATES),
+        "total_activities": 0,
+        "locations_detail": {}
+    }
+    
+    for loc_name, loc_data in ACTIVITY_TEMPLATES.items():
+        count = len(loc_data.get("activities", []))
+        stats["total_activities"] += count
+        stats["locations_detail"][loc_name] = {
+            "activity_count": count,
+            "tags": loc_data.get("tags", []),
+        }
+    
+    return stats
+
+
+# ===========================================================================
+# CHẠY TRỰC TIẾP: hiển thị thống kê
+# ===========================================================================
+if __name__ == "__main__":
+    stats = get_stats()
+    print(f"\n{'=' * 50}")
+    print(f"  📊 THỐNG KÊ ACTIVITY TEMPLATES")
+    print(f"{'=' * 50}")
+    print(f"  Tổng locations: {stats['total_locations']}")
+    print(f"  Tổng activities: {stats['total_activities']}")
+    print()
+    
+    for loc_name, detail in stats["locations_detail"].items():
+        print(f"  📍 {loc_name}: {detail['activity_count']} activities")
+        print(f"     Tags: {', '.join(detail['tags'][:8])}...")
+    print()

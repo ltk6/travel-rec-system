@@ -135,7 +135,9 @@ def recommend():
             "location_vectors": {
                 "text": _safe_vec(vectors.get("text")),
                 "tag":  _safe_vec(vectors.get("tag")),
-            }
+            },
+            "metadata": loc.get("metadata", {}),
+            "geo":      loc.get("geo", {}),
         })
 
         loc_map[loc_id] = {
@@ -146,9 +148,15 @@ def recommend():
 
     # ── N4 ─────────────────────────────
     result = rank_locations({
+        "user_input": {
+            "text":              text,
+            "image_description": image_desc,
+            "tags":              tags,
+        },
         "user_vectors": user_vectors,
-        "locations": n4_locations,
-        "top_k": top_k
+        "locations":    n4_locations,
+        "constraints":  constraints,
+        "top_k":        top_k,
     })
 
     ranked = result.get("locations", [])
