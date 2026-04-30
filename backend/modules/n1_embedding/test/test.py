@@ -11,13 +11,13 @@ import sys
 CURRENT = Path(__file__).resolve()
 
 for parent in CURRENT.parents:
-    if (parent / "n1_embedding").exists():
+    if (parent / "backend").exists():
         sys.path.insert(0, str(parent))
         break
 else:
-    raise RuntimeError("Could not locate project root containing 'n1_embedding'")
+    raise RuntimeError("Could not locate project root containing 'backend'")
 
-from n1_embedding import embed
+from backend.modules.n1_embedding import embed
 
 
 # ─────────────────────────────────────────────
@@ -99,21 +99,45 @@ LOCATION_TESTS = [
 # ─────────────────────────────────────────────
 def run_tests(test_set: list[dict], prefix: str):
     for t in test_set:
-        result = embed({
+        result = embed([{
             "text": t.get("text"),
             "tags": t.get("tags"),
             "img_desc": t.get("img_desc"),
-        })
+        }])[0]
 
         save_json(result, f"{prefix}_{t['name']}.json")
 
+
+def run_batch_tests(test_set: list[dict], filename: str):
+    inputs = [{
+        "text": t.get("text"),
+        "tags": t.get("tags"),
+        "img_desc": t.get("img_desc"),
+    } for t in test_set]
+    
+    results = embed(inputs)
+    
+    output = []
+    for t, res in zip(test_set, results):
+        output.append({
+            "name": t.get("name"),
+            "result": res
+        })
+        
+    save_json(output, filename)
 
 # ─────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
-    print("Running USER tests...")
+    print("Running USER tests (individual)...")
     run_tests(USER_TESTS, "user")
 
-    print("Running LOCATION tests...")
+    print("Running LOCATION tests (individual)...")
     run_tests(LOCATION_TESTS, "location")
+    
+    print("Running USER tests (batch)...")
+    run_batch_tests(USER_TESTS, "batch_user.json")
+    
+    print("Running LOCATION tests (batch)...")
+    run_batch_tests(LOCATION_TESTS, "batch_location.json")

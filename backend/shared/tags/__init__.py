@@ -1,0 +1,1 @@
+from .tags import ALL_TAGS
