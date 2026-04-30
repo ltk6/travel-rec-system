@@ -134,7 +134,6 @@ DESIGN PRINCIPLES
 ─────────────────────────────────────────────
 """
 
-def rank_activities(data: dict) -> dict:
-    pass
+from .rank_activities import rank_activities
 
 __all__ = ["rank_activities"]

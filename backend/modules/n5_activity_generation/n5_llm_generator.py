@@ -36,6 +36,8 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL   = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
+LLM_ACTIVITIES_PER_CALL = 25
+
 # Danh sách tags chuẩn để LLM tham khảo
 VALID_TAGS = [
     "nature", "food", "culture", "adventure", "relax", "photography",
@@ -76,7 +78,7 @@ def _build_prompt(
       - Tags phong phú 5-7 tags mỗi activity
     """
     tags_str = ", ".join(user_tags) if user_tags else "không có sở thích cụ thể"
-    budget_str = f"{budget:,}".replace(",", ".")
+    budget_str = f"{budget_per_activity:,}".replace(",", ".")
 
     # Tạo location_id từ tên
     loc_id = f"loc_{location_name.lower().replace(' ', '_').replace('đ', 'd').replace('ă', 'a').replace('â', 'a').replace('ê', 'e').replace('ô', 'o').replace('ơ', 'o').replace('ư', 'u').replace('à', 'a').replace('á', 'a').replace('ả', 'a').replace('ã', 'a').replace('ạ', 'a').replace('è', 'e').replace('é', 'e').replace('ẻ', 'e').replace('ẽ', 'e').replace('ẹ', 'e').replace('ì', 'i').replace('í', 'i').replace('ỉ', 'i').replace('ĩ', 'i').replace('ị', 'i').replace('ò', 'o').replace('ó', 'o').replace('ỏ', 'o').replace('õ', 'o').replace('ọ', 'o').replace('ù', 'u').replace('ú', 'u').replace('ủ', 'u').replace('ũ', 'u').replace('ụ', 'u').replace('ỳ', 'y').replace('ý', 'y').replace('ỷ', 'y').replace('ỹ', 'y').replace('ỵ', 'y')}"
@@ -87,7 +89,7 @@ def _build_prompt(
 📝 Mô tả: {location_description}
 ❤️ Sở thích du khách: {tags_str}
 💰 Ngân sách tối đa mỗi hoạt động: {budget_str} VNĐ
-⏰ Thời gian tối đa mỗi hoạt động: {duration} phút
+⏰ Thời gian tối đa mỗi hoạt động: {max_time_per_activity} phút
 
 YÊU CẦU NGHIÊM NGẶT:
 1. Tạo đúng 10 hoạt động, mỗi hoạt động PHẢI KHÁC LOẠI (ngắm cảnh, trekking, ẩm thực, văn hóa, chụp ảnh, mạo hiểm, thư giãn, mua sắm, hidden gem, nightlife...).
@@ -110,7 +112,7 @@ YÊU CẦU NGHIÊM NGẶT:
 
 3. Tags PHẢI chọn từ danh sách: nature, food, culture, adventure, relax, photography, history, sports, shopping, entertainment, health, education, sea, beach, fun, music, family, sightseeing, trekking, mountain, waterfall, cave, island, temple, market, nightlife, romantic, ethnic, village, cycling, kayak, diving, snorkeling, sunrise, sunset, cuisine, local_food, street_food, heritage, architecture, hidden_gem, scenic, wildlife, eco, spiritual, art, craft, unique, motorbiking, road_trip, camping, homestay, experience, flower, lake, river, forest, agriculture, tradition.
 
-4. Chi phí PHẢI ≤ {budget_str} VNĐ. Thời gian PHẢI ≤ {duration} phút. Chi phí 0 cho hoạt động miễn phí.
+4. Chi phí PHẢI ≤ {budget_str} VNĐ. Thời gian PHẢI ≤ {max_time_per_activity} phút. Chi phí 0 cho hoạt động miễn phí.
 5. Ưu tiên hoạt động phù hợp sở thích: {tags_str}.
 6. Hoạt động PHẢI thực tế, có thể thực hiện tại {location_name}, phản ánh đúng đặc trưng địa phương.
 7. Đa dạng: có cả hoạt động miễn phí, budget thấp, và cao cấp.
@@ -366,6 +368,7 @@ def generate_from_llm(
     user_tags: List[str],
     budget_per_activity: int,
     max_time_per_activity: int,
+    num_activities: int = LLM_ACTIVITIES_PER_CALL,
     schema_v2: bool = False,
 ) -> Optional[List[Dict]]:
     """
@@ -419,11 +422,11 @@ def generate_from_llm(
     # Bước 4: Detect schema version từ response
     # Nếu response có trường "description" → schema v2
     # Nếu response có trường "desc" → schema v1
-    is_v2_response = any("description" in act for act in activities)
-    
+    is_v2_response = any("description" in act for act in raw_list)
+
     # Bước 5: Validate và lọc
     valid_activities = []
-    for act in activities:
+    for act in raw_list:
         if _validate_activity(act, schema_v2=is_v2_response):
             # Chuẩn hóa tags thành lowercase
             act["tags"] = [tag.lower().strip() for tag in act["tags"]]
@@ -452,5 +455,5 @@ def generate_from_llm(
         logger.warning(f"Không có activity hợp lệ từ LLM cho {location_name}")
         return None
 
-    logger.info("LLM generated %d valid activities for %s", len(valid), location_name)
-    return valid
+    logger.info("LLM generated %d valid activities for %s", len(valid_activities), location_name)
+    return valid_activities

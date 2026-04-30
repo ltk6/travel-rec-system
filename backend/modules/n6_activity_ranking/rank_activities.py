@@ -27,22 +27,21 @@
 import math   # dùng math.sqrt để tính cosine similarity
 
 #=============================================================================
-#DANH SÁCH CÁC HÀM PHỤ HỖ TRỢ 
+#DANH SÁCH CÁC HÀM PHỤ HỖ TRỢ
 #=============================================================================
 
 # Hàm 1: kiểm tra ràng buộc cứng
 
 def hard_constraint_violated(metadata, constraints):
     """
-    trả về true nếu hoạt động vi phạm ràng buộc cứng(bi loại)
-    trả về false nếu hoạt động không hợp lệ 
+    trả về True nếu hoạt động vi phạm ràng buộc cứng (bị loại).
+    trả về False nếu hoạt động không vi phạm ràng buộc nào.
 
-    hiện tại chỉ kiểm tra :thời gian của hoạt động không qua thời gian rảnh của 
-    user
+    hiện tại chỉ kiểm tra: thời gian hoạt động không vượt thời gian rảnh của user.
     """
     duration_user=constraints.get("duration")
     duration_act=metadata.get("estimated_duration")
-    
+
     #nếu cả hai đều có giá trị và hoạt động dài hơn thời gian rảnh -> loại
     if duration_user is not None and duration_act is not None:
         if duration_act > duration_user:
@@ -51,16 +50,16 @@ def hard_constraint_violated(metadata, constraints):
     return False
 
 #--------------------------------------------------------------------------------
-# Hàm 2: tính điểm khớp sở thích  
+# Hàm 2: tính điểm khớp sở thích
 
 def _semantic_score(user_vectors, act_vectors):
-    """ 
+    """
     Tính độ giống nhau giữa vector sở thích người dùng và vector hoạt động
 
     ý tưởng:
     user có nhiều kênh vector: tag, context, emotion, image
     hoạt động cũng có nhiều kênh vector : text, tag, intent
-    ta ghép các cặp kênh tương ứng , tính COSINE SIMILARITY từng cặp,   
+    ta ghép các cặp kênh tương ứng , tính COSINE SIMILARITY từng cặp,
     rồi lấy trung bình từng trọng số
 
     trả về: số thực trong đoạn [0,1] ( càng gần 1 càng khớp sở thích và ngược lại)
@@ -72,7 +71,7 @@ def _semantic_score(user_vectors, act_vectors):
         ("emotion", "intent", 0.25),   # cảm xúc khớp với ý định
     ]
 
-    sum_score=0.0 
+    sum_score=0.0
     total_weight=0.0
     #duyệt qua từng channel
     for channel_user, channel_act, weight in channel_pairs:
@@ -84,7 +83,7 @@ def _semantic_score(user_vectors, act_vectors):
             continue
         if len(v_user)==0 or len(v_act)==0:
             continue
-        
+
         # tính cosine similarity (kết quả từ -1 đến 1)
 
         sim = cosine_similarity(v_user, v_act)
@@ -98,7 +97,7 @@ def _semantic_score(user_vectors, act_vectors):
     # nếu không có cặp vector nào ->trả về điểm trung tính 0.5
     if total_weight ==0:
         return 0.5
-    
+
     #lấy điểm trung bình có trọng số
     return sum_score/total_weight
 
@@ -138,7 +137,7 @@ def cosine_similarity(v1, v2):
     #tránh chia cho 0
     if norm_v1==0 or norm_v2==0:
         return 0.0
-    
+
     return dot_product/(norm_v1*norm_v2)
 
 #--------------------------------------------------------------------------------
@@ -155,19 +154,15 @@ def _constraint_score(metadata,constraints):
     list_score =[]
     # 3.1: điểm về ngân sách
     price =metadata.get("price_level")
-
     if price is not None:
-        #price=0.0(miễn phí)-> điểm 1.0
-        #price=1.0(rất đắt)->điểm 0.0
-        budget_score = 1.0 - float(price)
-
-        if budget_score < 0:
-            budget_score = 0.0 #quy về băng 0.0 nếu điểm ngân sách dưới 0
-
+        # price_level từ N5 nằm trong [1.0, 5.0]:
+        #   1.0 (rẻ nhất) -> budget_score = 1.0
+        #   5.0 (đắt nhất) -> budget_score = 0.0
+        budget_score = max(0.0, min(1.0, (5.0 - float(price)) / 4.0))
         list_score.append(budget_score)
 
 
-    # 3.2: điểm về thời gian 
+    # 3.2: điểm về thời gian
 
     duration_user = constraints.get("duration")
     duration_act = metadata.get("estimated_duration")
@@ -221,7 +216,7 @@ def _context_score(metadata, context, constraints):
         tod_act =tod_act.lower().strip()
 
         if tod_act=="anytime":
-            # hoạt động này phù hợp mọi thời điểm 
+            # hoạt động này phù hợp mọi thời điểm
             list_score.append(1.0)
         elif tod_user == tod_act:
             #trùng giờ
@@ -259,15 +254,15 @@ def _context_score(metadata, context, constraints):
                 list_score.append(1.0)
             else:
                 list_score.append(0.7)
-    
+
     # 4.3: lấy điểm trung bình
     if len(list_score)==0:
         return 0.5 # không có data ->trung tính
-    
+
     total =0.0
     for d in list_score:
         total +=d
-    
+
     return total/len(list_score)
 
 #--------------------------------------------------------------------------------
@@ -312,7 +307,7 @@ def _build_reason(metadata, sem_score, cons_score, ctx_score):
 #=============================================================================
 def rank_activities(data):
     """
-    Hàm chính: 
+    Hàm chính:
     input: nhận 1 dict 'data'
     output: dict {"activities": [...]} đã xếp hạng
     """
@@ -322,29 +317,29 @@ def rank_activities(data):
     #bối cảnh (giờ, vị trí,...)
     context      =data.get("context",{})
     #danh sách các hoạt động từ N5
-    activities=data.get("activities",{})
+    activities=data.get("activities",[])
     #ngân sách thời gian,....
     constraints=data.get("constraints",{})
     #số lượng cần trả về
-    top_k=data.get("top_k",{})
+    top_k=data.get("top_k",5)
     #---------------------------------------------------
     # BƯỚC 2: trường hợp đặc biệt(không có gì để xếp hạng)
     if len(activities)==0 or top_k <=0:
         return {"activities": []}
-    
+
     #-------------------------------------------------------
-    # BƯỚC 3: duyệt qua từng hoạt động và tính điểm 
+    # BƯỚC 3: duyệt qua từng hoạt động và tính điểm
     scored_activities = []
     for activity in activities:
         metadata=activity.get("metadata",{})
         vectors=activity.get("vectors",{})
 
-        # 3.1 kiểm tả ràng buộc cứng - nếu vi phạm thì bỏ qua 
+        # 3.1 kiểm tả ràng buộc cứng - nếu vi phạm thì bỏ qua
 
         if hard_constraint_violated(metadata, constraints):
             continue
 
-        
+
         # 3.2 tính 3 điểm con
         sem_score=_semantic_score(user_vectors, vectors) #điểm sở thích
         cons_score=_constraint_score(metadata,constraints)#điểm ràng buộc
@@ -360,7 +355,7 @@ def rank_activities(data):
             sum_score = 0.0
         if sum_score > 1:
             sum_score = 1.0
-        
+
         # 3.4 tạo lý do
         reason = _build_reason(metadata, sem_score, cons_score, ctx_score)
 
@@ -378,8 +373,3 @@ def rank_activities(data):
     result=scored_activities[:top_k]
 
     return {"activities":result}
-
-
-
-
-
