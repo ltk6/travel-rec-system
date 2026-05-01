@@ -8,7 +8,15 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from backend.modules.n5_activity_generation.n5_activity_generator import generate_activities
+from backend.modules.n5_activity_generation import generate_activities
+from config.settings import GROQ_API_KEY
+import logging
+
+# Configure logging for test visibility
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # 1. Define Sample Input
 sample_data = {
@@ -23,20 +31,14 @@ sample_data = {
                 "name": "Bãi Sao Phú Quốc",
                 "description": "Bãi biển đẹp nhất Phú Quốc với cát trắng mịn và nước xanh ngọc."
             }
-        },
-        {
-            "location_id": "loc_001",
-            "metadata": {
-                "name": "Fansipan Sapa",
-                "description": "Nóc nhà Đông Dương với mây phủ quanh năm."
-            }
         }
     ],
     "constraints": {
         "budget": 5000000,
         "duration": 3,
         "people": 2
-    }
+    },
+    "target_count": 20
 }
 
 def run_test():
@@ -44,7 +46,7 @@ def run_test():
     print(f"Generating activities for: {[loc['metadata']['name'] for loc in sample_data['locations']]}")
     
     # 2. Generate Activities
-    # Note: If GEMINI_API_KEY is not set, it will automatically fallback to Template mode
+    # Note: If GROQ_API_KEY is not set, it will automatically fallback to Template mode
     result = generate_activities(sample_data)
     
     # 3. Save to JSON
@@ -62,8 +64,6 @@ def run_test():
     for i, act in enumerate(activities[:3]):
         meta = act.get("metadata", {})
         print(f"{i+1}. {meta.get('name', 'N/A')} ({act.get('location_id', 'N/A')})")
-        print(f"   Cost: {meta.get('cost', 0):,} VND | Duration: {meta.get('estimated_duration', 0)} mins")
-        print(f"   Reason: {act.get('reason', 'N/A')}\n")
 
 if __name__ == "__main__":
     run_test()

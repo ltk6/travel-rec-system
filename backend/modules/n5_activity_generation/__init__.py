@@ -1,101 +1,102 @@
 """
-─────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────────────────
 N5 — ACTIVITY GENERATION MODULE
-─────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────────────────
 
-─────────────────────────────────────────────
+Generates semantically-rich, embedding-optimised activity objects for each
+input location.  Uses hardcoded templates as ground truth to prevent LLM
+hallucination, then enriches them with full schema fields via Groq.
+
+─────────────────────────────────────────────────────────────────────────────
 INPUT
-─────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────────────────
 {
     "user": {
-        "text": str | None,
-        "img_desc": str | None,
-        "tags": list[str] | None
+        "text":     str | None,       # Free-form traveller description
+        "img_desc": str | None,       # Vision-extracted scene summary (upstream)
+        "tags":     list[str] | None  # Interest keywords e.g. ["food", "adventure"]
     },
 
     "locations": [
         {
-            "location_id": str,
+            "location_id": str,       # Must match a key in ACTIVITY_TEMPLATES
             "metadata": {
-                "name": str | None,
+                "name":        str | None,
                 "description": str | None,
-                "tags": list[str] | None
+                "tags":        list[str] | None
             }
         }
     ],
 
     "constraints": {
-        "budget": float | None,
-        "duration": float | None,
-        "people": int | None,
-        "time_of_day": str | None
-    }
+        "budget":      float | None,  # Max price_level (1–4 scale)
+        "duration":    float | None,  # Max activity duration in minutes
+        "people":      int   | None,  # Group size (influences social_level filter)
+        "time_of_day": str   | None   # morning / afternoon / evening / night
+    },
+
+    "target_count": int | None        # Activities per location (default 10, max 20)
 }
 
-─────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────────────────
 OUTPUT
-─────────────────────────────────────────────
+─────────────────────────────────────────────────────────────────────────────
 {
     "activities": [
         {
-            "activity_id": str,
+            "activity_id": str,       # Stable hash: act_<loc8>_<md5_6>
             "location_id": str,
 
             "metadata": {
 
-                # ─────────────────────────────
-                # CORE IDENTITY
-                # ─────────────────────────────
-                "name": str,
-                "description": str,
+                # ── Core Identity ────────────────────────────────────────────
+                "name":        str,   # 4–8 Vietnamese words
+                "description": str,   # ≤20 words — optimised for embedding
 
-                # ─────────────────────────────
-                # SEMANTIC CLASSIFICATION
-                # ─────────────────────────────
-                "activity_type": str,
-                # adventure / relaxation / food / culture / nightlife / nature / shopping
+                # ── Semantic Classification ──────────────────────────────────
+                "tags":             list[str],   # 6–10 items from shared tag map
+                "activity_type":    str,
+                # adventure | relaxation | food | culture | nightlife | nature | shopping
 
                 "activity_subtype": str | None,
-                # e.g. hiking / snorkeling / street food / museum visit
+                # snake_case freeform e.g. "hiking", "snorkeling", "street_food"
 
-                # ─────────────────────────────
-                # EXPERIENCE DYNAMICS
-                # ─────────────────────────────
-                "intensity": float,
-                # 0.0 (very chill) → 1.0 (very active)
+                # ── Experience Dynamics ──────────────────────────────────────
+                "intensity":      float,  # 0.0 (very chill) → 1.0 (very active)
+                "physical_level": float,  # 0.0 (no effort)  → 1.0 (strenuous)
+                "social_level":   float,  # 0.0 (solo)       → 1.0 (large group)
 
-                "physical_level": float | None,
-                # effort / movement intensity indicator
+                # ── Constraint Fit ───────────────────────────────────────────
+                "estimated_duration": int,    # minutes
+                "price_level":        float,  # 1.0 (free) → 4.0 (luxury)
+                "indoor_outdoor":     str,    # indoor | outdoor | mixed
+                "weather_dependent":  bool,
 
-                "social_level": float | None,
-                # solo → group-oriented activity scale
-
-                # ─────────────────────────────
-                # CONSTRAINT FIT
-                # ─────────────────────────────
-                "estimated_duration": float,
-                # minutes
-
-                "price_level": float,
-                # normalized cost scale
-
-                "indoor_outdoor": str,
-                # indoor / outdoor / mixed
-
-                "weather_dependent": bool,
-
-                # ─────────────────────────────
-                # CONTEXT FIT SIGNALS
-                # ─────────────────────────────
-                "time_of_day_suitable": str | None
-                # morning / afternoon / night / anytime
+                # ── Context Fit Signals ──────────────────────────────────────
+                "time_of_day_suitable": str
+                # morning | afternoon | evening | night | anytime
             }
         }
     ]
 }
+
+─────────────────────────────────────────────────────────────────────────────
+ENVIRONMENT VARIABLES
+─────────────────────────────────────────────────────────────────────────────
+GROQ_API_KEY          — Required. Groq API key.
+N5_GROQ_MODEL         — Default: llama-3.3-70b-versatile
+N5_TARGET_PER_LOC     — Default: 10
+N5_MAX_TARGET         — Default: 20
+N5_LLM_RATIO          — Default: 1.0  (0.0–1.0; fraction generated by LLM)
+N5_TEMPERATURE        — Default: 0.45
+N5_MAX_RETRIES        — Default: 5
+N5_RETRY_BASE_DELAY   — Default: 4.0  (seconds, doubles per retry)
+N5_INTER_REQUEST_DELAY— Default: 1.5  (seconds between locations)
+N5_MAX_DESC_WORDS     — Default: 20   (hard cap on description length)
+N5_MIN_TAGS           — Default: 6
+N5_MAX_TAGS           — Default: 10
 """
 
-from .n5_activity_generator import generate_activities
- 
+from .activity_generator import generate_activities
+
 __all__ = ["generate_activities"]
- 

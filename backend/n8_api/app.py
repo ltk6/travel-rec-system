@@ -44,8 +44,8 @@ from n3_database import get_all_locations
 from modules.n1_embedding import embed
 from modules.n2_image_processing import process_image
 from modules.n4_location_ranking import rank_locations
-from modules.n5_activity_generation.n5_activity_generator import generate_activities
-from modules.n6_activity_ranking.rank_activities import rank_activities
+from modules.n5_activity_generation import generate_activities
+from modules.n6_activity_ranking import rank_activities
 
 # ── Shared ────────────────────────────────────────────────────
 from shared.weights import get_weights
