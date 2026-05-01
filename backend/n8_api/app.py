@@ -44,9 +44,11 @@ from n3_database import get_all_locations
 from modules.n1_embedding import embed
 from modules.n2_image_processing import process_image
 from modules.n4_location_ranking import rank_locations
-from modules.n4_location_ranking.rank_locations import _get_weights
 from modules.n5_activity_generation.n5_activity_generator import generate_activities
 from modules.n6_activity_ranking.rank_activities import rank_activities
+
+# ── Shared ────────────────────────────────────────────────────
+from shared.weights import get_weights
 
 # ── Logging ───────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -138,7 +140,8 @@ def recommend():
         "img_desc": img_desc
     }])[0]
 
-    sig_k = n1_result.get("sig_k", 0)
+    text_k = n1_result.get("text_k", 0)
+    tags_k = n1_result.get("tags_k", 0)
     vectors = n1_result.get("vectors", {})
 
     # User vectors: text, aug_text, aug_tags, img_desc
@@ -178,7 +181,8 @@ def recommend():
 
     # ── N4 — Rank locations ────────────────────
     n4_result = rank_locations({
-        "sig_k": sig_k,
+        "text_k": text_k,
+        "tags_k": tags_k,
         "user_vectors": user_vectors,
         "locations": n4_locations,
         "top_k": int(body.get("top_k_locations", 5)),
@@ -219,7 +223,8 @@ def recommend():
                     "img_desc": img_desc,
                 },
                 "n1_embedding": {
-                    "sig_k": sig_k,
+                    "text_k": text_k,
+                    "tags_k": tags_k,
                     "preprocessed": n1_result.get("preprocessed", {}),
                 },
                 "user_vectors": user_vectors,
@@ -241,8 +246,9 @@ def recommend():
 
             # ─── RANKING OUTPUT ───
             "ranking": {
-                "sig_k": sig_k,
-                "weights_used": _get_weights(sig_k),
+                "text_k": text_k,
+                "tags_k": tags_k,
+                "weights_used": get_weights(text_k, tags_k),
                 "top_k": int(body.get("top_k_locations", 5)),
                 "ranked": ranked,
             },
@@ -273,7 +279,8 @@ def get_activities():
       "text": str,
       "img_desc": str,
       "tags": list,
-      "sig_k": int,
+      "text_k": int,
+      "tags_k": int,
       "user_vectors": dict,
       "constraints": dict,
       "context": dict,
@@ -285,7 +292,8 @@ def get_activities():
     text = body.get("text", "")
     img_desc = body.get("img_desc", "")
     tags = body.get("tags", [])
-    sig_k = body.get("sig_k", 0)
+    text_k = body.get("text_k", 0)
+    tags_k = body.get("tags_k", 0)
     user_vectors = body.get("user_vectors", {})
     constraints = body.get("constraints", {})
     context_data = body.get("context", {})
@@ -345,7 +353,8 @@ def get_activities():
 
     # ── N6 — Rank Activities ───────────────────
     n6_input = {
-        "sig_k": sig_k,
+        "text_k": text_k,
+        "tags_k": tags_k,
         "user_input": {
             "text": text,
             "img_desc": img_desc,

@@ -26,9 +26,7 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from .emotions import ALL_EMOTIONS
-from backend.shared.tags import ALL_TAGS
-from .context import ALL_CONTEXT
+from backend.shared.maps import ALL_CONTEXT, ALL_EMOTIONS, ALL_TAGS
 
 
 # ── Lowercased lookup tables built once at import ─────────────────────────────

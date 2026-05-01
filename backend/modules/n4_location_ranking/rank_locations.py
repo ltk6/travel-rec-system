@@ -12,7 +12,7 @@ Scoring channels (user → location):
     aug_tags  → tag  : tag-based anchor
     img_desc  → text : visual alignment
 
-Weights are dynamically set based on sig_k (keyword expansion count).
+Weights are resolved dynamically using shared/weights.
 """
 
 from __future__ import annotations
@@ -23,36 +23,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── sig_k-based dynamic weights (see vector-usage-guide.md) ──
-WEIGHT_TABLE = {
-    0: {"text": 0.3, "aug_text": 0.0, "aug_tags": 0.5, "img_desc": 0.2},
-    1: {"text": 0.1, "aug_text": 0.3, "aug_tags": 0.4, "img_desc": 0.2},
-    2: {"text": 0.2, "aug_text": 0.2, "aug_tags": 0.4, "img_desc": 0.2},
-    3: {"text": 0.3, "aug_text": 0.1, "aug_tags": 0.4, "img_desc": 0.2},
-}
-
-
-def _get_weights(sig_k: int) -> dict[str, float]:
-    """
-    Dynamic weights:
-    - sig_k <= 3 → base table
-    - sig_k 3→10 → aug_text decays NON-LINEAR from 0.1 → 0
-    """
-    base = WEIGHT_TABLE.get(min(sig_k, 3), WEIGHT_TABLE[0])
-
-    if sig_k <= 3:
-        return base
-
-    start, end = 3, 10
-    t = (sig_k - start) / (end - start)
-    t = max(0.0, min(1.0, t))
-
-    return {
-        "text": base["text"],
-        "aug_text": 0.1 * (1 - t) ** 3,
-        "aug_tags": base["aug_tags"],
-        "img_desc": base["img_desc"],
-    }
+from backend.shared.weights import get_weights
 
 # ── Helpers ───────────────────────────────────────────────────
 
@@ -77,9 +48,6 @@ def _cosine(a: list[float] | None, b: list[float] | None) -> float:
     return _dot(a, b) / (na * nb)
 
 # ── Scoring ───────────────────────────────────────────────────
-
-
-
 
 def _score_location(
     user_vectors: dict[str, Any],
@@ -119,14 +87,21 @@ def _score_location(
     # Build reason from signals that are active (weight > 0) and match well (sim >= 0.3)
     parts: list[str] = []
     
-    if sim_text >= 0.3:
-        parts.append(f"ý định rõ ({sim_text:.2f})")
-    if sim_aug_text >= 0.3:
-        parts.append(f"ngữ cảnh phù hợp ({sim_aug_text:.2f})")
-    if sim_aug_tags >= 0.3:
-        parts.append(f"sở thích khớp ({sim_aug_tags:.2f})")
-    if sim_img_desc >= 0.3:
+    # Merge text and aug_text into a single "content" reason
+    text_sims = []
+    if weights["text"] > 0 and sim_text >= 0.3:
+        text_sims.append(sim_text)
+    if weights["aug_text"] > 0 and sim_aug_text >= 0.3:
+        text_sims.append(sim_aug_text)
+    
+    if text_sims:
+        max_text_sim = max(text_sims)
+        parts.append(f"phù hợp yêu cầu ({max_text_sim:.2f})")
+    if weights["aug_tags"] > 0 and sim_aug_tags >= 0.3:
+        parts.append(f"phù hợp sở thích ({sim_aug_tags:.2f})")
+    if weights["img_desc"] > 0 and sim_img_desc >= 0.3:
         parts.append(f"hình ảnh tương đồng ({sim_img_desc:.2f})")
+    
     reason = " · ".join(parts) if parts else "Địa điểm phổ biến"
 
     return round(float(score), 4), reason
@@ -140,7 +115,8 @@ def rank_locations(data: dict) -> dict:
 
     Input:
     {
-        "sig_k": int,
+        "text_k": int,
+        "tags_k": int,
         "user_vectors": {
             "text":     list[float] | None,
             "aug_text": list[float] | None,
@@ -176,7 +152,8 @@ def rank_locations(data: dict) -> dict:
     }
     """
 
-    sig_k        = int(data.get("sig_k", 0))
+    text_k       = int(data.get("text_k", 0))
+    tags_k       = int(data.get("tags_k", 0))
     user_vectors = data.get("user_vectors", {})
     locations    = data.get("locations", [])
     top_k        = max(1, int(data.get("top_k", 5)))
@@ -185,8 +162,8 @@ def rank_locations(data: dict) -> dict:
         logger.warning("[N4] Không có địa điểm nào để xếp hạng")
         return {"locations": []}
 
-    # ── resolve weights from sig_k ───────────────────────────
-    weights = _get_weights(sig_k)
+    # ── resolve weights from text_k & tags_k ──────────────────
+    weights = get_weights(text_k, tags_k)
 
     scored: list[dict] = []
     for loc in locations:

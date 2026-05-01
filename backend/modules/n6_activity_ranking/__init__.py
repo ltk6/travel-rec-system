@@ -20,7 +20,8 @@ IMPORTANT:
 INPUT
 ─────────────────────────────────────────────
 {
-    "sig_k": int,
+    "text_k": int,
+    "tags_k": int,
 
     # ───────── USER INPUT ─────────
     "user_input": {

@@ -11,7 +11,8 @@ INPUT:
 
 OUTPUT:
 {
-    "sig_k": int,
+    "text_k": int,
+    "tags_k": int,
     "vectors": {
         "text": list[float],
         "aug_text": list[float],
@@ -70,7 +71,8 @@ def embed(data_list: list[Dict[str, Any]]) -> list[Dict[str, Any]]:
         item_vecs = flat_vectors[start_idx : start_idx + num_channels]
         
         results.append({
-            "sig_k": p["kw_count"],
+            "text_k": p["text_k"],
+            "tags_k": p["tags_k"],
             "preprocessed": {
                 "text":     p["text"],
                 "aug_text": p["aug_text"],
