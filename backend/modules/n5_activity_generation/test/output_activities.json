@@ -1,379 +1,400 @@
 {
   "activities": [
     {
-      "activity_id": "act_loc_015_fd497b",
+      "activity_id": "act_loc_015_ce1fff",
       "location_id": "loc_015",
       "metadata": {
-        "name": "Thư giãn trên bãi cát trắng mịn Bãi Sao",
-        "description": "Thư giãn trên bãi cát trắng mịn và cảm nhận sự yên bình của biển.",
+        "name": "Thư giãn trên bãi cát trắng mịn",
+        "description": "Tận hưởng không khí trong lành và cảm giác thư giãn trên bãi cát trắng mịn của Bãi Sao.",
         "tags": [
           "beach",
-          "relax",
-          "nature"
+          "peaceful",
+          "chill",
+          "cozy"
         ],
-        "activity_type": "relaxation",
-        "intensity": 0.2,
-        "physical_level": 0.1,
-        "estimated_duration": 60.0,
-        "price_level": 2.0
-      }
-    },
-    {
-      "activity_id": "act_loc_015_5bfeeb",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Lặn ống thở ngắm sao biển đỏ",
-        "description": "Khám phá thế giới dưới biển và ngắm sao biển đỏ độc đáo.",
-        "tags": [
-          "nature",
-          "diving",
-          "snorkeling"
-        ],
-        "activity_type": "nature",
-        "intensity": 0.8,
-        "physical_level": 0.7,
-        "estimated_duration": 90.0,
-        "price_level": 3.5
-      }
-    },
-    {
-      "activity_id": "act_loc_015_532449",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Đi cáp treo Hòn Thơm vượt biển",
-        "description": "Thưởng thức cảnh biển tuyệt đẹp từ trên cao và cảm nhận sự thú vị của cáp treo.",
-        "tags": [
-          "nature",
-          "adventure"
-        ],
-        "activity_type": "nature",
-        "intensity": 0.6,
-        "physical_level": 0.4,
-        "estimated_duration": 30.0,
-        "price_level": 2.5
-      }
-    },
-    {
-      "activity_id": "act_loc_015_400984",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Thưởng thức gỏi cá trích đặc sản",
-        "description": "Thưởng thức món ăn đặc sản của Phú Quốc và cảm nhận sự phong phú của hải sản.",
-        "tags": [
-          "food",
-          "seafood",
-          "local cuisine"
-        ],
-        "activity_type": "food",
-        "intensity": 0.1,
-        "physical_level": 0.0,
-        "estimated_duration": 30.0,
-        "price_level": 3.0
-      }
-    },
-    {
-      "activity_id": "act_loc_015_118ee4",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Đi bộ dọc bãi biển Bãi Sao",
-        "description": "Thưởng thức cảnh biển tuyệt đẹp và cảm nhận sự yên bình của biển.",
-        "tags": [
-          "beach",
-          "nature",
-          "walk"
-        ],
-        "activity_type": "relaxation",
-        "intensity": 0.3,
-        "physical_level": 0.2,
-        "estimated_duration": 60.0,
-        "price_level": 1.0
-      }
-    },
-    {
-      "activity_id": "act_loc_015_57983c",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Lặn biển ngắm san hô",
-        "description": "Khám phá thế giới dưới biển và ngắm san hô độc đáo.",
-        "tags": [
-          "nature",
-          "diving",
-          "snorkeling"
-        ],
-        "activity_type": "nature",
-        "intensity": 0.8,
-        "physical_level": 0.7,
-        "estimated_duration": 90.0,
-        "price_level": 3.5
-      }
-    },
-    {
-      "activity_id": "act_loc_015_38b7f2",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Thư giãn tại bãi biển Bãi Sao vào buổi tối",
-        "description": "Thư giãn trên bãi cát trắng mịn và cảm nhận sự yên bình của biển vào buổi tối.",
-        "tags": [
-          "beach",
-          "relax",
-          "nature"
-        ],
-        "activity_type": "relaxation",
-        "intensity": 0.2,
-        "physical_level": 0.1,
-        "estimated_duration": 60.0,
-        "price_level": 2.0
-      }
-    },
-    {
-      "activity_id": "act_loc_015_3d49bc",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Thưởng thức hải sản tươi sống",
-        "description": "Thưởng thức hải sản tươi sống và cảm nhận sự phong phú của hải sản.",
-        "tags": [
-          "food",
-          "seafood",
-          "local cuisine"
-        ],
-        "activity_type": "food",
-        "intensity": 0.1,
-        "physical_level": 0.0,
-        "estimated_duration": 30.0,
-        "price_level": 3.0
-      }
-    },
-    {
-      "activity_id": "act_loc_015_d7fce6",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Khám phá đảo Hòn Thơm",
-        "description": "Khám phá đảo Hòn Thơm và cảm nhận sự thú vị của hành trình.",
-        "tags": [
-          "nature",
-          "adventure"
-        ],
-        "activity_type": "nature",
-        "intensity": 0.6,
-        "physical_level": 0.4,
-        "estimated_duration": 120.0,
-        "price_level": 3.5
-      }
-    },
-    {
-      "activity_id": "act_loc_015_254f18",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Thư giãn tại resort trên bãi biển Bãi Sao",
-        "description": "Thư giãn tại resort và cảm nhận sự yên bình của biển.",
-        "tags": [
-          "beach",
-          "relax",
-          "luxury"
-        ],
-        "activity_type": "relaxation",
-        "intensity": 0.2,
-        "physical_level": 0.22,
-        "social_level": 0.63,
-        "estimated_duration": 188.0,
-        "price_level": 3.9,
-        "indoor_outdoor": "outdoor",
-        "weather_dependent": true,
-        "time_of_day_suitable": "morning"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_012855",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Thư giãn tắm biển tại Bãi Sao Phú Quốc",
-        "description": "Tắm mình trong làn nước biển mát lành tại Bãi Sao Phú Quốc. Nằm dài trên bãi cát trắng mịn, nghe sóng vỗ và tận hưởng cảm giác bình yên tuyệt đối.",
         "activity_type": "relaxation",
         "activity_subtype": "beach_relaxation",
-        "intensity": 0.13,
-        "physical_level": 0.12,
-        "social_level": 0.38,
-        "estimated_duration": 136.0,
-        "price_level": 1.5,
+        "intensity": 0.2,
+        "physical_level": 0.1,
+        "social_level": 0.3,
+        "estimated_duration": 120,
+        "price_level": 1.0,
         "indoor_outdoor": "outdoor",
-        "weather_dependent": true,
-        "time_of_day_suitable": "morning"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_c9abca",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Nghỉ dưỡng resort Bãi Sao Phú Quốc",
-        "description": "Tận hưởng kỳ nghỉ sang trọng tại resort cao cấp của Bãi Sao Phú Quốc với hồ bơi, bãi biển riêng và dịch vụ 5 sao. Quên đi mọi lo toan trong không gian đẳng cấp.",
-        "activity_type": "relaxation",
-        "activity_subtype": "beach_relaxation",
-        "intensity": 0.06,
-        "physical_level": 0.14,
-        "social_level": 0.34,
-        "estimated_duration": 443.0,
-        "price_level": 4.9,
-        "indoor_outdoor": "mixed",
         "weather_dependent": false,
         "time_of_day_suitable": "anytime"
       }
     },
     {
-      "activity_id": "act_loc_015_1f3e2a",
+      "activity_id": "act_loc_015_8348b2",
       "location_id": "loc_015",
       "metadata": {
-        "name": "Chèo kayak khám phá Bãi Sao Phú Quốc",
-        "description": "Trải nghiệm cảm giác mạnh khi chèo kayak trên mặt nước tại Bãi Sao Phú Quốc. Khám phá những ngóc ngách ẩn mình và tận hưởng cảm giác tự do trên sóng nước.",
-        "activity_type": "adventure",
-        "activity_subtype": "kayaking",
-        "intensity": 0.76,
-        "physical_level": 0.62,
-        "social_level": 0.39,
-        "estimated_duration": 133.0,
-        "price_level": 3.4,
-        "indoor_outdoor": "outdoor",
-        "weather_dependent": true,
-        "time_of_day_suitable": "morning"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_234a2d",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Thưởng thức hải sản tươi sống Bãi Sao Phú Quốc",
-        "description": "Thưởng thức hải sản tươi ngon nhất của Bãi Sao Phú Quốc tại các nhà hàng ven biển. Tôm hùm, cua, ốc, cá được chế biến đặc trưng theo phong cách địa phương.",
-        "activity_type": "food",
-        "activity_subtype": "seafood_dining",
-        "intensity": 0.15,
-        "physical_level": 0.06,
-        "social_level": 0.46,
-        "estimated_duration": 97.0,
-        "price_level": 5.0,
-        "indoor_outdoor": "mixed",
-        "weather_dependent": false,
-        "time_of_day_suitable": "afternoon"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_f178c7",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Trải nghiệm spa và massage tại Bãi Sao Phú Quốc",
-        "description": "Thả lỏng cơ thể với dịch vụ spa cao cấp tại Bãi Sao Phú Quốc. Được xoa bóp bằng tinh dầu thảo mộc địa phương và tận hưởng cảm giác thư thái từ đầu đến chân.",
-        "activity_type": "relaxation",
-        "activity_subtype": "spa_massage",
-        "intensity": 0.08,
-        "physical_level": 0.07,
-        "social_level": 0.31,
-        "estimated_duration": 86.0,
-        "price_level": 3.5,
-        "indoor_outdoor": "indoor",
-        "weather_dependent": false,
-        "time_of_day_suitable": "afternoon"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_6e5560",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Trải nghiệm bar đêm Bãi Sao Phú Quốc",
-        "description": "Trải nghiệm cuộc sống về đêm sôi động của Bãi Sao Phú Quốc tại các bar và pub nổi tiếng. Âm nhạc sống động, cocktail thơm ngon và không khí cuồng nhiệt.",
-        "activity_type": "nightlife",
-        "activity_subtype": "bar_pub",
-        "intensity": 0.41,
-        "physical_level": 0.29,
-        "social_level": 0.84,
-        "estimated_duration": 237.0,
-        "price_level": 4.0,
-        "indoor_outdoor": "indoor",
-        "weather_dependent": false,
-        "time_of_day_suitable": "night"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_8fcdce",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Trải nghiệm nhà hàng đặc sắc Bãi Sao Phú Quốc",
-        "description": "Thưởng thức bữa ăn tại nhà hàng nổi tiếng của Bãi Sao Phú Quốc với không gian thiết kế đẹp và menu phong phú kết hợp hương vị địa phương và hiện đại.",
-        "activity_type": "food",
-        "activity_subtype": "restaurant_dining",
-        "intensity": 0.04,
-        "physical_level": 0.06,
-        "social_level": 0.61,
-        "estimated_duration": 88.0,
-        "price_level": 2.8,
-        "indoor_outdoor": "indoor",
-        "weather_dependent": false,
-        "time_of_day_suitable": "afternoon"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_b54672",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Thư giãn tắm biển tại Bãi Sao Phú Quốc — cùng bạn bè",
-        "description": "Cùng bạn bè tận hưởng: Tắm mình trong làn nước biển mát lành tại Bãi Sao Phú Quốc. Nằm dài trên bãi cát trắng mịn, nghe sóng vỗ và tận hưởng cảm giác bình yên tuyệt đối.",
-        "activity_type": "relaxation",
-        "activity_subtype": "beach_relaxation",
-        "intensity": 0.2,
-        "physical_level": 0.13,
-        "social_level": 0.33,
-        "estimated_duration": 266.0,
-        "price_level": 1.9,
-        "indoor_outdoor": "outdoor",
-        "weather_dependent": true,
-        "time_of_day_suitable": "morning"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_bda274",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Nghỉ dưỡng resort Bãi Sao Phú Quốc — ban đêm",
-        "description": "Khám phá vẻ đẹp huyền ảo về đêm: Tận hưởng kỳ nghỉ sang trọng tại resort cao cấp của Bãi Sao Phú Quốc với hồ bơi, bãi biển riêng và dịch vụ 5 sao. Quên đi mọi lo toan trong không gian đẳng cấp.",
-        "activity_type": "relaxation",
-        "activity_subtype": "beach_relaxation",
-        "intensity": 0.04,
-        "physical_level": 0.02,
-        "social_level": 0.2,
-        "estimated_duration": 381.0,
-        "price_level": 3.7,
-        "indoor_outdoor": "mixed",
-        "weather_dependent": false,
-        "time_of_day_suitable": "night"
-      }
-    },
-    {
-      "activity_id": "act_loc_015_adda52",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Trải nghiệm bar đêm Bãi Sao Phú Quốc — cùng bạn bè",
-        "description": "Cùng bạn bè tận hưởng: Trải nghiệm cuộc sống về đêm sôi động của Bãi Sao Phú Quốc tại các bar và pub nổi tiếng. Âm nhạc sống động, cocktail thơm ngon và không khí cuồng nhiệt.",
-        "activity_type": "nightlife",
-        "activity_subtype": "bar_pub",
-        "intensity": 0.51,
-        "physical_level": 0.1,
-        "estimated_duration": 180.0,
-        "price_level": 4.0
-      }
-    },
-    {
-      "activity_id": "act_loc_015_655ec2",
-      "location_id": "loc_015",
-      "metadata": {
-        "name": "Thưởng thức bữa tối hải sản",
-        "description": "Thưởng thức bữa tối hải sản và cảm nhận sự phong phú của hải sản.",
+        "name": "Lặn ống thở ngắm sao biển đỏ",
+        "description": "Khám phá dưới đáy biển và ngắm nhìn sao biển đỏ tại Bãi Sao Phú Quốc.",
         "tags": [
-          "food",
-          "seafood",
-          "local cuisine"
+          "snorkeling",
+          "adventure",
+          "beach"
+        ],
+        "activity_type": "adventure",
+        "activity_subtype": "snorkeling",
+        "intensity": 0.6,
+        "physical_level": 0.7,
+        "social_level": 0.4,
+        "estimated_duration": 90,
+        "price_level": 2.0,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "morning"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_b1d972",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Thưởng thức gỏi cá trích đặc sản",
+        "description": "Thưởng thức món gỏi cá trích đặc sản với hương vị tươi ngon và độc đáo.",
+        "tags": [
+          "seafood"
         ],
         "activity_type": "food",
-        "intensity": 0.1,
-        "physical_level": 0.0,
-        "estimated_duration": 90.0,
-        "price_level": 3.5
+        "activity_subtype": "seafood_tasting",
+        "intensity": 0.3,
+        "physical_level": 0.2,
+        "social_level": 0.5,
+        "estimated_duration": 60,
+        "price_level": 2.5,
+        "indoor_outdoor": "indoor",
+        "weather_dependent": false,
+        "time_of_day_suitable": "afternoon"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_428022",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Đi cáp treo Hòn Thơm vượt biển",
+        "description": "Trải nghiệm đi cáp treo vượt biển và ngắm nhìn cảnh quan tuyệt đẹp của Phú Quốc.",
+        "tags": [
+          "adventure"
+        ],
+        "activity_type": "adventure",
+        "activity_subtype": "cable_car_ride",
+        "intensity": 0.5,
+        "physical_level": 0.4,
+        "social_level": 0.6,
+        "estimated_duration": 45,
+        "price_level": 3.0,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "morning"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_d207da",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Tắm biển tại Bãi Sao",
+        "description": "Tắm biển tại bãi biển tuyệt đẹp và thư giãn trong làn nước xanh ngọc.",
+        "tags": [
+          "beach",
+          "swimming"
+        ],
+        "activity_type": "relaxation",
+        "activity_subtype": "beach_swimming",
+        "intensity": 0.4,
+        "physical_level": 0.5,
+        "social_level": 0.4,
+        "estimated_duration": 90,
+        "price_level": 1.0,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "afternoon"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_b4048c",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Khám phá rừng ngập mặn",
+        "description": "Khám phá hệ động thực vật phong phú của rừng ngập mặn tại Phú Quốc.",
+        "tags": [
+          "mangrove",
+          "adventure",
+          "wildlife"
+        ],
+        "activity_type": "nature",
+        "activity_subtype": "mangrove_exploration",
+        "intensity": 0.5,
+        "physical_level": 0.6,
+        "social_level": 0.4,
+        "estimated_duration": 120,
+        "price_level": 2.0,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "morning"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_4571b8",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Thưởng thức hải sản nướng",
+        "description": "Thưởng thức hải sản nướng với hương vị tươi ngon và đậm đà.",
+        "tags": [
+          "seafood"
+        ],
+        "activity_type": "food",
+        "activity_subtype": "seafood_grilling",
+        "intensity": 0.3,
+        "physical_level": 0.2,
+        "social_level": 0.5,
+        "estimated_duration": 60,
+        "price_level": 2.5,
+        "indoor_outdoor": "indoor",
+        "weather_dependent": false,
+        "time_of_day_suitable": "evening"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_a84d61",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Chèo thuyền kayak trên biển",
+        "description": "Trải nghiệm chèo thuyền kayak trên biển và khám phá cảnh quan tuyệt đẹp.",
+        "tags": [
+          "kayaking",
+          "adventure",
+          "beach"
+        ],
+        "activity_type": "adventure",
+        "activity_subtype": "kayaking",
+        "intensity": 0.7,
+        "physical_level": 0.8,
+        "social_level": 0.4,
+        "estimated_duration": 90,
+        "price_level": 2.5,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "morning"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_d52659",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Tổ chức picnic trên bãi biển",
+        "description": "Tổ chức picnic trên bãi biển và tận hưởng không khí trong lành.",
+        "tags": [
+          "beach",
+          "picnic",
+          "family"
+        ],
+        "activity_type": "relaxation",
+        "activity_subtype": "beach_picnic",
+        "intensity": 0.2,
+        "physical_level": 0.1,
+        "social_level": 0.6,
+        "estimated_duration": 120,
+        "price_level": 1.5,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "afternoon"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_c356c7",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Lặn biển sâu khám phá",
+        "description": "Trải nghiệm lặn biển sâu và khám phá thế giới dưới đáy biển.",
+        "tags": [
+          "adventure"
+        ],
+        "activity_type": "adventure",
+        "activity_subtype": "scuba_diving",
+        "intensity": 0.8,
+        "physical_level": 0.9,
+        "social_level": 0.4,
+        "estimated_duration": 120,
+        "price_level": 3.5,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "morning"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_b4187f",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Thăm quan làng chài Hàm Ninh",
+        "description": "Thăm quan làng chài Hàm Ninh và tìm hiểu về cuộc sống của ngư dân.",
+        "tags": [
+          "authentic"
+        ],
+        "activity_type": "culture",
+        "activity_subtype": "village_visit",
+        "intensity": 0.4,
+        "physical_level": 0.3,
+        "social_level": 0.5,
+        "estimated_duration": 90,
+        "price_level": 1.5,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": false,
+        "time_of_day_suitable": "afternoon"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_e84c6b",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Chụp ảnh trên bãi biển",
+        "description": "Chụp ảnh trên bãi biển và lưu giữ những khoảnh khắc tuyệt đẹp.",
+        "tags": [
+          "beach",
+          "photography",
+          "instagrammable"
+        ],
+        "activity_type": "relaxation",
+        "activity_subtype": "beach_photography",
+        "intensity": 0.2,
+        "physical_level": 0.1,
+        "social_level": 0.4,
+        "estimated_duration": 60,
+        "price_level": 1.0,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": false,
+        "time_of_day_suitable": "anytime"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_58231e",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Thưởng thức đặc sản bánh kẹo",
+        "description": "Thưởng thức đặc sản bánh kẹo với hương vị độc đáo và tươi ngon.",
+        "tags": [],
+        "activity_type": "food",
+        "activity_subtype": "dessert_tasting",
+        "intensity": 0.3,
+        "physical_level": 0.2,
+        "social_level": 0.5,
+        "estimated_duration": 60,
+        "price_level": 2.0,
+        "indoor_outdoor": "indoor",
+        "weather_dependent": false,
+        "time_of_day_suitable": "afternoon"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_e9c7d9",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Đi bộ đường dài trên rừng",
+        "description": "Trải nghiệm đi bộ đường dài trên rừng và khám phá hệ động thực vật phong phú.",
+        "tags": [
+          "hiking",
+          "adventure",
+          "forest"
+        ],
+        "activity_type": "adventure",
+        "activity_subtype": "hiking",
+        "intensity": 0.7,
+        "physical_level": 0.8,
+        "social_level": 0.4,
+        "estimated_duration": 120,
+        "price_level": 2.0,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "morning"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_78c404",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Tổ chức tiệc hải sản BBQ",
+        "description": "Tổ chức tiệc hải sản BBQ với hương vị tươi ngon và đậm đà.",
+        "tags": [
+          "seafood",
+          "beach"
+        ],
+        "activity_type": "food",
+        "activity_subtype": "seafood_bbq",
+        "intensity": 0.4,
+        "physical_level": 0.3,
+        "social_level": 0.7,
+        "estimated_duration": 120,
+        "price_level": 3.0,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "evening"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_26c0e5",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Khám phá đảo Hòn Móng Tay",
+        "description": "Khám phá đảo Hòn Móng Tay và tìm hiểu về hệ động thực vật phong phú.",
+        "tags": [
+          "island",
+          "adventure",
+          "wildlife"
+        ],
+        "activity_type": "nature",
+        "activity_subtype": "island_exploration",
+        "intensity": 0.5,
+        "physical_level": 0.6,
+        "social_level": 0.4,
+        "estimated_duration": 120,
+        "price_level": 2.5,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "morning"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_48acf8",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Thăm quan nhà thờ Dinh Cậu",
+        "description": "Thăm quan nhà thờ Dinh Cậu và tìm hiểu về lịch sử và văn hóa.",
+        "tags": [
+          "church",
+          "history"
+        ],
+        "activity_type": "culture",
+        "activity_subtype": "church_visit",
+        "intensity": 0.4,
+        "physical_level": 0.3,
+        "social_level": 0.5,
+        "estimated_duration": 60,
+        "price_level": 1.0,
+        "indoor_outdoor": "indoor",
+        "weather_dependent": false,
+        "time_of_day_suitable": "afternoon"
+      }
+    },
+    {
+      "activity_id": "act_loc_015_293bc6",
+      "location_id": "loc_015",
+      "metadata": {
+        "name": "Chèo thuyền buồm trên biển",
+        "description": "Trải nghiệm chèo thuyền buồm trên biển và khám phá cảnh quan tuyệt đẹp.",
+        "tags": [
+          "adventure",
+          "beach"
+        ],
+        "activity_type": "adventure",
+        "activity_subtype": "sailing",
+        "intensity": 0.5,
+        "physical_level": 0.6,
+        "social_level": 0.4,
+        "estimated_duration": 90,
+        "price_level": 2.5,
+        "indoor_outdoor": "outdoor",
+        "weather_dependent": true,
+        "time_of_day_suitable": "morning"
       }
     }
   ]

@@ -18,7 +18,7 @@ MAX_TARGET_PER_LOCATION     = int(os.getenv("N5_MAX_TARGET", 20))
 # ---------------------------------------------------------------------------
 # llama-3.3-70b-versatile gives far better structured output than 8b-instant.
 # Switch back to 8b if Groq TPM is tight.
-GROQ_MODEL   = os.getenv("N5_GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL   = os.getenv("N5_GROQ_MODEL", "meta-llama/Llama-4-Scout-17B-16E-Instruct")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_TEMPERATURE = float(os.getenv("N5_TEMPERATURE", 0.45))   # lower = tighter schema adherence
 GROQ_MAX_TOKENS  = int(os.getenv("N5_MAX_TOKENS", 4096))
