@@ -49,50 +49,22 @@ def hard_constraint_violated(metadata, constraints):
 
     return False
 
-# ── sig_k-based dynamic weights ──
-WEIGHT_TABLE = {
-    0: {"text": 0.40, "aug_text": 0.00, "aug_tags": 0.60},
-    1: {"text": 0.10, "aug_text": 0.50, "aug_tags": 0.40},
-    2: {"text": 0.20, "aug_text": 0.40, "aug_tags": 0.40},
-    3: {"text": 0.30, "aug_text": 0.30, "aug_tags": 0.40},
-}
-
-
-def _get_weights(sig_k: int) -> dict[str, float]:
-    """
-    Dynamic weights:
-    - sig_k <= 3 → base table
-    - sig_k 3→10 → aug_text decays NON-LINEAR from base → 0
-    """
-    base = WEIGHT_TABLE.get(min(sig_k, 3), WEIGHT_TABLE[0])
-
-    if sig_k <= 3:
-        return base
-
-    start, end = 3, 10
-    t = (sig_k - start) / (end - start)
-    t = max(0.0, min(1.0, t))
-
-    return {
-        "text": base["text"],
-        "aug_text": base["aug_text"] * (1 - t) ** 3,
-        "aug_tags": base["aug_tags"],
-    }
+from backend.shared.weights import get_weights
 
 #--------------------------------------------------------------------------------
 # Hàm 2: tính điểm khớp sở thích
 
-def _semantic_score(user_vectors, act_vectors, sig_k=0):
+def _semantic_score(user_vectors, act_vectors, text_k=0, tags_k=0):
     """
     Tính độ giống nhau giữa vector sở thích người dùng và vector hoạt động
-    Sử dụng trọng số động dựa trên sig_k (giống N4)
+    Sử dụng trọng số động dựa trên text_k và tags_k
     """
-    weights = _get_weights(sig_k)
+    weights = get_weights(text_k, tags_k)
     
     channel_pairs = [
-        ("aug_tags", "tag", weights["aug_tags"]),
-        ("aug_text", "text", weights["aug_text"]),
-        ("text", "text", weights["text"]),
+        ("aug_tags", "tag", weights.get("aug_tags", 0.0)),
+        ("aug_text", "text", weights.get("aug_text", 0.0)),
+        ("text", "text", weights.get("text", 0.0)),
     ]
 
     sum_score=0.0
@@ -109,7 +81,6 @@ def _semantic_score(user_vectors, act_vectors, sig_k=0):
             continue
 
         # tính cosine similarity (kết quả từ -1 đến 1)
-
         sim = cosine_similarity(v_user, v_act)
 
         #đưa từ [-1,1] về [0,1] để dễ kết hợp với các điểm khác
@@ -347,7 +318,8 @@ def rank_activities(data):
     #số lượng cần trả về
     top_k=data.get("top_k",5)
     #tín hiệu mở rộng từ điển
-    sig_k=data.get("sig_k",0)
+    text_k=data.get("text_k",0)
+    tags_k=data.get("tags_k",0)
     #---------------------------------------------------
     # BƯỚC 2: trường hợp đặc biệt(không có gì để xếp hạng)
     if len(activities)==0 or top_k <=0:
@@ -367,7 +339,7 @@ def rank_activities(data):
 
 
         # 3.2 tính 3 điểm con
-        sem_score=_semantic_score(user_vectors, vectors, sig_k) #điểm sở thích
+        sem_score=_semantic_score(user_vectors, vectors, text_k, tags_k) #điểm sở thích
         cons_score=_constraint_score(metadata,constraints)#điểm ràng buộc
         ctx_score=_context_score(metadata, context, constraints)#điểm ngữ cảnh
 

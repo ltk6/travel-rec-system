@@ -6,7 +6,7 @@ Returns preprocessed texts and kw_exp_count (total keyword expansions found).
 
 from __future__ import annotations
 
-from .maps import scan_text, expand_tags, MatchResult
+from .registry import scan_text, expand_tags, MatchResult
 
 
 def _dedupe(items: list[str]) -> list[str]:
@@ -28,20 +28,20 @@ def build_inputs(
     """
     Build all preprocessed channels and count keyword expansions.
 
-    Returns dict with keys: text, aug_text, aug_tags, img_desc, kw_count.
-    kw_count = total number of unique keywords detected in text.
+    Returns dict with keys: text, aug_text, aug_tags, img_desc, text_k, tags_k.
     """
     text = (text or "").strip()
     tags = tags or []
     img_desc = (img_desc or "").strip()
-    kw_count = 0
+    text_k = 0
+    tags_k = 0
 
     # Text → emotion + context keyword expansion
     if text:
         scan = scan_text(text)
         emotion_kw = _dedupe(_expansions(scan["emotion"]))
         context_kw = _dedupe(_expansions(scan["context"]))
-        kw_count += len(emotion_kw) + len(context_kw)
+        text_k = len(emotion_kw) + len(context_kw)
         parts = [text, " ".join(emotion_kw), " ".join(context_kw)]
         aug_text = " ".join(p for p in parts if p)
     else:
@@ -51,6 +51,7 @@ def build_inputs(
     if tags:
         tag_scan = expand_tags(tags)
         tag_kw = _dedupe(_expansions(tag_scan["tag"]))
+        tags_k = len(tag_kw)
         aug_tags = " ".join(tag_kw)
     else:
         aug_tags = ""
@@ -60,5 +61,6 @@ def build_inputs(
         "aug_text": aug_text,
         "aug_tags": aug_tags,
         "img_desc": img_desc,
-        "kw_count": kw_count,
+        "text_k":   text_k,
+        "tags_k":   tags_k,
     }
