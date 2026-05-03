@@ -34,6 +34,12 @@ st.markdown("""
         border: 1px solid #f0ece1;
     }
     
+    /* Bo góc cho ảnh bìa (nếu dùng st.image) */
+    [data-testid="stImage"] img {
+        border-radius: 20px;
+        margin-bottom: 10px;
+    }
+    
     /* -----------------------------------------------------------------
        MAGIC CSS: BIẾN CHECKBOX THÀNH CLICKABLE CARDS — EQUAL HEIGHT
        ----------------------------------------------------------------- */
@@ -43,13 +49,19 @@ st.markdown("""
         align-items: stretch !important;
     }
 
-    /* Ép các cột Streamlit stretch theo chiều cao nhau */
+    /* Ép các cột Streamlit stretch theo chiều cao nhau và CHỐNG TRÀN CHIỀU NGANG */
     div[data-testid="column"] {
         display: flex !important;
         flex-direction: column !important;
+        min-width: 0 !important; /* FIX: Ép cột giữ đúng tỷ lệ, không bị phình to do nội dung chữ dài */
     }
 
-    /* stCheckbox container chiếm toàn bộ chiều cao cột */
+    /* FIX: Đảm bảo Container bao bọc Checkbox bắt buộc chiếm trọn 100% chiều ngang của cột */
+    div[data-testid="stElementContainer"] {
+        width: 100% !important;
+    }
+
+    /* stCheckbox container chiếm toàn bộ chiều cao và chiều ngang cột */
     div[data-testid="stCheckbox"] {
         width: 100% !important;
         flex: 1 1 auto !important;
@@ -107,6 +119,7 @@ st.markdown("""
         line-height: 1.4;
         font-size: 0.95rem;
         white-space: pre-wrap; 
+        overflow-wrap: break-word; /* FIX: Chữ dài tự rớt dòng, không ép giãn ngang thẻ */
         width: 100%;
     }
     
@@ -115,7 +128,6 @@ st.markdown("""
         font-size: 2.8rem;
         line-height: 1.8;
     }
-    /* ----------------------------------------------------------------- */
     
     /* Nút Submit lộng lẫy */
     button[kind="primary"] {
@@ -123,7 +135,6 @@ st.markdown("""
         background: linear-gradient(135deg, #ff7b9c 0%, #ff6b6b 100%);
         border: none;
         color: white;
-        font-weight: 700;
         padding: 14px 0;
         font-size: 1.2rem;
         margin-top: 15px;
@@ -134,11 +145,30 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
     }
-    
-    /* Ghi đè màu Progress Bar thành hồng cam */
-    .stProgress > div > div > div {
-        background-color: #ff6b6b;
+    /* FIX: Ép in đậm chữ bên trong nút Submit */
+    button[kind="primary"] * {
+        font-weight: 800 !important; 
     }
+    
+    /* -----------------------------------------------------------------
+       TÙY CHỈNH THANH TIẾN ĐỘ (PROGRESS BAR) CHUẨN 1 THANH
+       ----------------------------------------------------------------- */
+    /* Vỏ ngoài (Track) màu trắng, viền đen */
+    div[data-testid="stProgressBar"] {
+        background-color: #ffffff !important;
+        border: 2px solid #000000 !important;
+        border-radius: 12px !important;
+        height: 22px !important;
+        overflow: hidden !important;
+    }
+    
+    /* Ruột bên trong (Fill) lấp đầy màu xanh lá, đánh bay màu xanh mặc định */
+    div[data-testid="stProgressBar"] > div {
+        background-color: #4CAF50 !important;
+        height: 100% !important;
+        border-radius: 0 !important;
+    }
+    /* ----------------------------------------------------------------- */
     
     /* Tiêu đề */
     h1, h2, h3, h4, p, label { color: #1a1a2e !important; }
@@ -492,8 +522,22 @@ def render_clickable_cards(question_text, hint, mapping_dict, q_idx, is_multi=Fa
 _, col_input, _ = st.columns([0.1, 4, 0.1])
 
 with col_input:
-    st.markdown("<h1 style='text-align: center; font-size: 2.8rem;'>🧭 Travel Planner</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #7f8c8d; margin-bottom: 30px; font-size: 1.1rem;'>Answer a few questions and we'll find your perfect destination.</p>", unsafe_allow_html=True)
+    # --- THÊM ẢNH BÌA MÁY BAY BẦU TRỜI XANH, BỎ KHUNG TRẮNG, DÙNG BÓNG MỜ CHO CHỮ ---
+    st.markdown("""
+    <div style="
+        background-image: url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=2560&auto=format&fit=crop');
+        background-size: cover;
+        background-position: center;
+        border-radius: 20px;
+        padding: 100px 20px;
+        margin-bottom: 30px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    ">
+        <h1 style='color: #0f172a !important; font-size: 3.6rem; margin-bottom: 10px; text-shadow: 0px 0px 15px rgba(255,255,255,0.9), 0px 0px 5px rgba(255,255,255,0.9);'>🧭 Travel Planner</h1>
+        <p style='color: #1e293b !important; font-size: 1.25rem; margin-bottom: 0; font-weight: 700; text-shadow: 0px 0px 10px rgba(255,255,255,0.9);'>Answer a few questions and we'll find your perfect destination.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
     tags = []
     constraints_list = []
@@ -601,7 +645,7 @@ with col_input:
     # Form có 19 câu hỏi dạng check/radio
     progress = min(answered / 19, 1.0)
     
-    st.markdown(f"<p style='text-align: center; color: #ff6b6b; font-weight: bold; margin-bottom: 5px; font-size: 0.95rem;'>🚀 Preference gathering progress: {int(progress * 100)}%</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align: center; color: #1e293b; font-weight: bold; margin-bottom: 5px; font-size: 0.95rem;'>🚀 Preference gathering progress: {int(progress * 100)}%</p>", unsafe_allow_html=True)
     st.progress(progress)
     st.write("") 
     
