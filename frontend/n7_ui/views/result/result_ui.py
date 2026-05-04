@@ -10,6 +10,33 @@ def render_result_view(response_data: dict):
     locations = response_data.get("locations", [])
     trace = response_data.get("trace", {})
 
+    # =========================================================
+    # INJECT CSS ĐỂ CỐ ĐỊNH KÍCH THƯỚC NÚT & CĂN GIỮA NỘI DUNG
+    # =========================================================
+    st.markdown("""
+    <style>
+        /* Thiết kế ô hộp (box) cố định chiều cao đủ cho tối đa 50 ký tự (khoảng 2-3 dòng) */
+        div[data-testid="stButton"] > button {
+            height: 65px !important;
+            width: 100% !important;
+            display: inline-flex !important;
+            align-items: center !important; /* Căn giữa theo chiều dọc */
+            justify-content: center !important; /* Căn giữa theo chiều ngang */
+            padding: 5px !important;
+            border-radius: 8px !important;
+        }
+        /* Chữ bên trong được phép rớt dòng và căn giữa */
+        div[data-testid="stButton"] > button p {
+            white-space: normal !important; 
+            word-wrap: break-word !important;
+            text-align: center !important; 
+            font-size: 14px !important;
+            line-height: 1.3 !important;
+            margin: 0 !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
     if not locations:
         st.warning("Không tìm thấy địa điểm nào phù hợp. Vui lòng thử lại!")
         return
@@ -60,7 +87,8 @@ def render_result_view(response_data: dict):
         # ---------------------------------------------------------
         # TẦNG 2: RENDER NỘI DUNG CHI TIẾT CỦA 1 ĐỊA ĐIỂM
         # ---------------------------------------------------------
-        loc = locations[st.session_state.slide_idx]
+        idx = st.session_state.slide_idx
+        loc = locations[idx]
         metadata = loc.get("metadata", {})
         score = loc.get("score", 0)
         loc_activities = loc.get("activities", [])
@@ -97,34 +125,80 @@ def render_result_view(response_data: dict):
         with left_col:
             image_url = loc.get("image_url") or loc.get("image_path")
             if image_url:
-                st.image(image_url, use_container_width=True)
+                # Dùng HTML/CSS để cố định khung ảnh (chiếm ~60%) và tự động crop/khớp ảnh (object-fit: cover)
+                # Tích hợp Nút mờ (Icon) ở góc phải trên cùng để mở Modal xem ảnh toàn màn hình bằng CSS thuần.
+                img_html = f"""
+                <style>
+                .modal-check-{idx} {{ display: none; }}
+                .lightbox-{idx} {{
+                    display: none;
+                    position: fixed;
+                    z-index: 999999;
+                    top: 0; left: 0;
+                    width: 100vw; height: 100vh;
+                    background: rgba(0,0,0,0.85);
+                    align-items: center; justify-content: center;
+                }}
+                .modal-check-{idx}:checked ~ .lightbox-{idx} {{ display: flex; }}
+                .lightbox-{idx} img {{
+                    max-width: 90vw; max-height: 90vh;
+                    border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                }}
+                .close-btn-{idx} {{
+                    position: absolute; top: 20px; right: 30px;
+                    color: white; font-size: 40px; cursor: pointer;
+                    font-weight: bold; user-select: none;
+                }}
+                </style>
+                
+                <div style="position: relative; width: 100%; height: 380px; border-radius: 8px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(49, 51, 63, 0.2);">
+                    <img src="{image_url}" style="width: 100%; height: 100%; object-fit: cover;" alt="Location Image">
+                    <!-- Nút bấm mờ góc phải trên -->
+                    <label for="img_popup_{idx}" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.4); color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 16px; border: 1px solid rgba(255,255,255,0.3);">
+                        ⛶
+                    </label>
+                </div>
+
+                <!-- Checkbox ẩn điều khiển trạng thái mở ảnh -->
+                <input type="checkbox" id="img_popup_{idx}" class="modal-check-{idx}">
+                <!-- Modal phóng to ảnh -->
+                <div class="lightbox-{idx}">
+                    <label for="img_popup_{idx}" class="close-btn-{idx}">×</label>
+                    <img src="{image_url}">
+                </div>
+                """
+                st.markdown(img_html, unsafe_allow_html=True)
             
-            st.write(metadata.get("description", "Không có mô tả chi tiết."))
-            
-            if loc.get("reason"):
-                st.info(f"💡 **Lý do đề xuất:** {loc.get('reason')}")
+            # Cố định khung chứa text (Mô tả & Lý do) với thanh cuộn dọc (scroll) - chiếm ~40%
+            with st.container(height=222, border=True):
+                st.write(metadata.get("description", "Không có mô tả chi tiết."))
+                if loc.get("reason"):
+                    st.info(f"💡 **Lý do đề xuất:** {loc.get('reason')}")
                 
         with right_col:
             st.markdown("#### 🎯 Các hoạt động nên thử")
-            if loc_activities:
-                for act in loc_activities:
-                    act_score = int(act.get('score', 0) * 100)
-                    act_color = "#4CAF50" if act_score >= 80 else ("#FF9800" if act_score >= 60 else "#F44336")
-                    
-                    act_html = f"""
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0;">
-                        <span style="font-weight: 600; font-size: 15px; padding-right: 10px;">{act.get('activity_id', 'Hoạt động')}</span>
-                        <div style="width: 44px; height: 44px; border-radius: 50%; background: conic-gradient({act_color} {act_score}%, #f0f2f6 0); display: flex; justify-content: center; align-items: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <div style="width: 32px; height: 32px; border-radius: 50%; background: white; display: flex; justify-content: center; align-items: center;">
-                                <span style="font-size: 12px; font-weight: bold; color: {act_color};">{act_score}%</span>
+            # Cố định khung chứa danh sách hoạt động. 
+            # Đặt chiều cao 600px để phần đáy cột phải phẳng hàng với phần đáy ô mô tả bên cột trái.
+            with st.container(height=530, border=True):
+                if loc_activities:
+                    for act in loc_activities:
+                        act_score = int(act.get('score', 0) * 100)
+                        act_color = "#4CAF50" if act_score >= 80 else ("#FF9800" if act_score >= 60 else "#F44336")
+                        
+                        act_html = f"""
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0;">
+                            <span style="font-weight: 600; font-size: 15px; padding-right: 10px;">{act.get('activity_id', 'Hoạt động')}</span>
+                            <div style="width: 44px; height: 44px; border-radius: 50%; background: conic-gradient({act_color} {act_score}%, #f0f2f6 0); display: flex; justify-content: center; align-items: center; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="width: 32px; height: 32px; border-radius: 50%; background: white; display: flex; justify-content: center; align-items: center;">
+                                    <span style="font-size: 12px; font-weight: bold; color: {act_color};">{act_score}%</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    """
-                    with st.container(border=True):
-                        st.markdown(act_html, unsafe_allow_html=True)
-            else:
-                st.caption("Chưa có gợi ý hoạt động nào.")
+                        """
+                        with st.container(border=True):
+                            st.markdown(act_html, unsafe_allow_html=True)
+                else:
+                    st.caption("Chưa có gợi ý hoạt động nào.")
 
         st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
 
