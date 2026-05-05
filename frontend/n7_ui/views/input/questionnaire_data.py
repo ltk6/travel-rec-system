@@ -42,7 +42,7 @@ QUESTIONNAIRE_CONFIG = {
             "🌿 Hệ sinh thái": {
                 "Vườn quốc gia" : ["national park"],
                 "Rừng rậm"      : ["forest"],
-                "Khu bảo tồn"   : ["biosphere reserve", "nature reserve"],
+                "Khu bảo tồn"   : ["nature reserve"],
                 "Rạn san hô"    : ["coral reef"],
             },
             "🏙️ Xã hội": {
@@ -65,6 +65,7 @@ QUESTIONNAIRE_CONFIG = {
                 "Rừng thông"        : ["pine forest"],
                 "Rừng tre"          : ["bamboo forest"],
                 "Rừng ngập mặn"     : ["mangrove"],
+                "Khu dự trữ sinh quyển": ["biosphere reserve"],
                 "Ruộng bậc thang"   : ["rice terrace"],
                 "Nông trại"         : ["farm"],
                 "Đồng hoa"          : ["flower field"],

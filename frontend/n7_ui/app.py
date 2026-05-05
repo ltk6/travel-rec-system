@@ -15,6 +15,7 @@ from styles import inject_custom_css
 from views.header import render_sticky_header
 from views.input import render_input_view
 from views.result import render_result_view
+import time
 
 # ── Page config ──
 st.set_page_config(
@@ -78,6 +79,7 @@ else:
 
     # Phase 2: results ready → show result view
     elif st.session_state.results:
+        time.sleep(3)
         scroll_to_top()
         render_result_view(st.session_state.results)
 
